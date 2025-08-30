@@ -15,15 +15,15 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        
         securityContext:
-          runAsUser: 0
-          privileged: true
-        
+          runAsUser: 1000
+          privileged: false
         env:
         - name: SECRET_KEY
-          value: "sk-secret123"
-        
+          valueFrom:
+            secretKeyRef:
+              name: secret-key
+              key: SECRET_KEY
         resources: {}
         
 ---

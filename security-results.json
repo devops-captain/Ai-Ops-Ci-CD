@@ -1,0 +1,22 @@
+{
+  "summary": "\ud83e\udd16 Pure AI: 2 issues analyzed, 2 files fixed",
+  "issues": [
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "infra.tf"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "deploy.yaml"
+    }
+  ],
+  "files_scanned": 2,
+  "fixes_applied": 2,
+  "scan_cost": 0.217,
+  "estimated_monthly_cost": 6.51,
+  "ai_calls": 2
+}
