@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: production-app
+  namespace: default
+automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: production-app-role
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]  # Full cluster admin access
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: production-app-binding
+subjects:
+- kind: ServiceAccount
+  name: production-app
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: production-app-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: production-web-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: production-web-app
+  template:
+    metadata:
+      labels:
+        app: production-web-app
+    spec:
+      serviceAccountName: production-app
+      hostNetwork: true  # Host network access
+      hostPID: true      # Host PID namespace
+      hostIPC: true      # Host IPC namespace
+      
+      containers:
+      - name: web-app
+        image: nginx:latest  # No version pinning
+        
+        securityContext:
+          runAsUser: 0  # Root user
+          runAsGroup: 0
+          privileged: true  # Privileged container
+          allowPrivilegeEscalation: true
+          readOnlyRootFilesystem: false
+          capabilities:
+            add: ["SYS_ADMIN", "NET_ADMIN", "SYS_TIME", "SYS_PTRACE"]
+        
+        env:
+        - name: DATABASE_URL
+          value: "mysql://root:password123@db:3306/app"
+        - name: REDIS_URL
+          value: "redis://admin:secret@redis:6379"
+        - name: JWT_SECRET
+          value: "super-secret-jwt-key"
+        - name: API_KEY
+          value: "sk-1234567890abcdef"
+        - name: ADMIN_PASSWORD
+          value: "admin123"
+        
+        ports:
+        - containerPort: 80
+          hostPort: 80  # Direct host port binding
+        - containerPort: 443
+          hostPort: 443
+        
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: false  # Writable host filesystem
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        - name: host-proc
+          mountPath: /host/proc
+        
+        resources: {}  # No resource limits
+        
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /  # Mount entire host filesystem
+          type: Directory
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: production-web-service
+spec:
+  type: LoadBalancer  # Direct internet exposure
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    nodePort: 30080
+  - name: https
+    port: 443
+    targetPort: 443
+    nodePort: 30443
+  selector:
+    app: production-web-app
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all
+spec:
+  podSelector: {}  # Apply to all pods
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}  # Allow all ingress traffic
+  egress:
+  - {}  # Allow all egress traffic
