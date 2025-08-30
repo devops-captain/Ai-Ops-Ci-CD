@@ -12,14 +12,19 @@ class PureAISecurityAnalyzer:
         self.fixes_applied = []
         
     def ai_analyze_and_fix(self, content, filename):
-        """Pure AI analysis and fixing using Nova Micro - NO MANUAL RULES"""
-        prompt = f"""You are a security expert. Analyze {filename} and fix ALL security vulnerabilities.
+        """Pure AI analysis and fixing using Nova Micro"""
+        prompt = f"""Fix security issues in {filename}. Provide the complete fixed file.
 
-Original file:
 {content}
 
-Return ONLY this JSON format with the complete fixed file:
-{{"issues":[{{"severity":"high","description":"security issue found","line":1}}],"fixed_content":"COMPLETE FIXED FILE CONTENT HERE","changes_made":["specific change made"]}}"""
+Return the fixed content in this format:
+FIXED_CONTENT_START
+[complete fixed file content here]
+FIXED_CONTENT_END
+
+CHANGES:
+- change 1
+- change 2"""
 
         try:
             response = self.bedrock.invoke_model(
@@ -44,46 +49,76 @@ Return ONLY this JSON format with the complete fixed file:
             output_text = result['output']['message']['content'][0]['text'].strip()
             
             print(f"🤖 AI analyzing {filename}...")
+            print(f"AI response length: {len(output_text)} chars")
             
-            # Extract JSON from AI response - NO MANUAL FIXES
-            try:
-                # Clean response
-                cleaned = re.sub(r'```json\s*', '', output_text)
-                cleaned = re.sub(r'```\s*', '', cleaned)
+            # Extract fixed content using markers
+            fixed_content = None
+            changes = []
+            
+            # Method 1: Look for FIXED_CONTENT markers
+            content_match = re.search(r'FIXED_CONTENT_START\s*(.*?)\s*FIXED_CONTENT_END', output_text, re.DOTALL)
+            if content_match:
+                fixed_content = content_match.group(1).strip()
+                print(f"✅ Extracted fixed content using markers ({len(fixed_content)} chars)")
+            
+            # Method 2: Look for code blocks
+            if not fixed_content:
+                if filename.endswith('.tf'):
+                    code_match = re.search(r'```(?:terraform|hcl)?\s*(.*?)```', output_text, re.DOTALL)
+                else:
+                    code_match = re.search(r'```(?:yaml|yml)?\s*(.*?)```', output_text, re.DOTALL)
                 
-                # Find JSON block
-                json_match = re.search(r'\{.*?"fixed_content".*?\}', cleaned, re.DOTALL)
-                if json_match:
-                    ai_result = json.loads(json_match.group(0))
-                    if ai_result.get('fixed_content'):
-                        print(f"✅ AI provided complete fixed content")
-                        return ai_result
-                
-                # Try regex extraction
-                content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
-                if content_match:
-                    fixed_content = content_match.group(1)
-                    fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"')
-                    
-                    if len(fixed_content) > 50:  # Reasonable content length
-                        return {
-                            "issues": [{"severity": "high", "description": "AI detected and fixed security issues", "line": 1}],
-                            "fixed_content": fixed_content,
-                            "changes_made": ["AI applied comprehensive security fixes"]
-                        }
-                
-                print(f"⚠️ Could not extract valid fixed content from AI")
+                if code_match:
+                    fixed_content = code_match.group(1).strip()
+                    print(f"✅ Extracted fixed content from code block ({len(fixed_content)} chars)")
+            
+            # Method 3: Look for structured content
+            if not fixed_content:
+                if filename.endswith('.tf'):
+                    tf_match = re.search(r'(resource\s+"[^"]+"\s+"[^"]+"\s*\{.*)', output_text, re.DOTALL)
+                    if tf_match:
+                        fixed_content = tf_match.group(1).strip()
+                        print(f"✅ Extracted Terraform content ({len(fixed_content)} chars)")
+                else:
+                    yaml_match = re.search(r'(apiVersion:.*)', output_text, re.DOTALL)
+                    if yaml_match:
+                        fixed_content = yaml_match.group(1).strip()
+                        print(f"✅ Extracted YAML content ({len(fixed_content)} chars)")
+            
+            # Extract changes
+            changes_match = re.search(r'CHANGES:\s*(.*?)(?:\n\n|\Z)', output_text, re.DOTALL)
+            if changes_match:
+                changes_text = changes_match.group(1)
+                changes = [line.strip('- ').strip() for line in changes_text.split('\n') if line.strip().startswith('-')]
+            
+            if not changes:
+                # Look for any bullet points or changes mentioned
+                change_patterns = [
+                    r'(?:Fixed|Changed|Updated|Removed|Added).*?(?:\n|$)',
+                    r'-\s+.*?(?:\n|$)',
+                    r'•\s+.*?(?:\n|$)'
+                ]
+                for pattern in change_patterns:
+                    matches = re.findall(pattern, output_text, re.IGNORECASE)
+                    if matches:
+                        changes = [match.strip() for match in matches[:3]]  # Limit to 3
+                        break
+            
+            if not changes:
+                changes = ["AI applied security improvements"]
+            
+            # Validate fixed content
+            if fixed_content and len(fixed_content) > 50 and fixed_content != content:
+                return {
+                    "issues": [{"severity": "high", "description": "Security vulnerabilities fixed by AI", "line": 1}],
+                    "fixed_content": fixed_content,
+                    "changes_made": changes
+                }
+            else:
+                print(f"⚠️ No valid fixed content extracted")
                 return {
                     "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
-                    "fixed_content": content,  # Return original - NO MANUAL CHANGES
-                    "changes_made": []
-                }
-                    
-            except Exception as e:
-                print(f"⚠️ AI response parsing failed: {e}")
-                return {
-                    "issues": [{"severity": "low", "description": "AI analysis attempted", "line": 1}],
-                    "fixed_content": content,  # Return original - NO MANUAL CHANGES
+                    "fixed_content": content,
                     "changes_made": []
                 }
             
@@ -91,12 +126,12 @@ Return ONLY this JSON format with the complete fixed file:
             print(f"❌ AI API call failed for {filename}: {e}")
             return {
                 "issues": [],
-                "fixed_content": content,  # Return original - NO MANUAL CHANGES
+                "fixed_content": content,
                 "changes_made": []
             }
     
     def apply_ai_fixes(self, file_path):
-        """Apply ONLY AI-generated fixes - NO MANUAL RULES"""
+        """Apply AI-generated fixes"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
@@ -110,11 +145,10 @@ Return ONLY this JSON format with the complete fixed file:
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # Apply ONLY if AI provided different content with changes
+            # Apply fixes if we have different content
             if (fixed_content and 
                 fixed_content != original_content and 
-                len(changes) > 0 and
-                len(fixed_content) > 50):  # Ensure we have substantial content
+                len(changes) > 0):
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(fixed_content)
@@ -124,7 +158,7 @@ Return ONLY this JSON format with the complete fixed file:
                     'issues_fixed': len(issues),
                     'changes': changes
                 })
-                print(f"✅ AI applied {len(changes)} fixes to {file_path}")
+                print(f"✅ AI applied fixes to {file_path}")
                 for change in changes:
                     print(f"   - {change}")
             else:
@@ -156,12 +190,11 @@ Return ONLY this JSON format with the complete fixed file:
             files.extend(glob.glob(pattern))
         
         print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
-        print("Using 100% AI intelligence - NO manual rules or fixes")
         
         all_issues = []
         
         for file_path in files:
-            if os.path.getsize(file_path) < 12288:  # 12KB limit
+            if os.path.getsize(file_path) < 12288:
                 issues = self.apply_ai_fixes(file_path)
                 for issue in issues:
                     issue['file'] = file_path
@@ -192,9 +225,7 @@ Return ONLY this JSON format with the complete fixed file:
         print(f"   Cost: ${costs['per_scan']}")
         
         if fixed_count > 0:
-            print(f"\n✅ {fixed_count} files modified by AI - ready for workflow to commit")
-        else:
-            print(f"\nℹ️ No files modified - AI analysis complete")
+            print(f"\n✅ {fixed_count} files modified by AI")
         
         return 0
 
