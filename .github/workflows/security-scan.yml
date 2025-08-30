@@ -13,7 +13,7 @@ jobs:
   ai-security-fixer:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Need write access to push fixes
+      contents: write
       pull-requests: write
 
     steps:
@@ -21,6 +21,7 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
+        ref: ${{ github.head_ref }}  # Checkout the PR branch
 
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -37,8 +38,24 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
+    - name: Configure Git
+      run: |
+        git config --global user.name "AI Security Fixer"
+        git config --global user.email "ai@security.com"
+
     - name: AI Security Analysis & Auto-Fix
       run: python security_analyzer.py
+
+    - name: Push fixes if any
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "Changes detected, pushing fixes..."
+          git add .
+          git commit -m "🤖 AI Security Fixes Applied" || echo "No changes to commit"
+          git push origin ${{ github.head_ref }} || echo "Push failed but continuing..."
+        else
+          echo "No changes to push"
+        fi
 
     - name: Comment PR with Results
       if: github.event_name == 'pull_request'
@@ -54,21 +71,19 @@ jobs:
             
             if (results.fixes_applied > 0) {
               comment += `### ✅ Auto-Fixed Issues\n`;
-              results.issues.filter(i => i.fixed).forEach(issue => {
+              results.issues.forEach(issue => {
                 comment += `- **${issue.severity.toUpperCase()}** in \`${issue.file}\`: ${issue.description}\n`;
               });
               comment += `\n🚀 **${results.fixes_applied} files automatically updated and pushed!**\n\n`;
             }
             
-            const remaining = results.issues.filter(i => !i.fixed);
-            if (remaining.length > 0) {
-              comment += `### ⚠️ Manual Review Needed\n`;
-              remaining.forEach(issue => {
-                comment += `- **${issue.severity.toUpperCase()}** in \`${issue.file}\`: ${issue.description}\n`;
-              });
-            }
+            comment += `### 📊 Scan Details\n`;
+            comment += `- **Files scanned:** ${results.files_scanned}\n`;
+            comment += `- **AI API calls:** ${results.ai_calls}\n`;
+            comment += `- **Issues found:** ${results.issues.length}\n`;
+            comment += `- **Files fixed:** ${results.fixes_applied}\n\n`;
             
-            comment += `\n💰 **Cost:** $${results.scan_cost} (Monthly: $${results.estimated_monthly_cost})`;
+            comment += `💰 **Cost:** $${results.scan_cost} (Monthly estimate: $${results.estimated_monthly_cost})`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
