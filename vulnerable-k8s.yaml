@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-web-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vulnerable-web-app
+  template:
+    metadata:
+      labels:
+        app: vulnerable-web-app
+    spec:
+      containers:
+      - name: web
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        
+        # CRITICAL: Running as root
+        securityContext:
+          runAsUser: 0
+          privileged: true  # CRITICAL: Privileged container
+        
+        # HIGH: Hardcoded secrets in environment
+        env:
+        - name: DATABASE_PASSWORD
+          value: "admin123"
+        - name: JWT_SECRET
+          value: "my-secret-key"
+        - name: API_TOKEN
+          value: "token-12345"
+        
+        # MEDIUM: No resource limits
+        resources: {}
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulnerable-web-service
+spec:
+  type: LoadBalancer  # MEDIUM: Direct internet exposure
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: vulnerable-web-app
