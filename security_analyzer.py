@@ -3,236 +3,230 @@ import os
 import json
 import boto3
 import glob
-import re
 import subprocess
+import re
+from datetime import datetime
 
-class AISecurityFixer:
+class PureAISecurityAnalyzer:
     def __init__(self):
         self.bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.api_calls = 0
         self.fixes_applied = []
         
-    def detect_and_fix_issues(self, content, filename):
-        """Detect issues and apply automatic fixes"""
-        original_content = content
-        fixed_content = content
-        issues = []
-        
-        # Fix 1: Replace 0.0.0.0/0 with restricted CIDR
-        if '0.0.0.0/0' in content and '.tf' in filename:
-            fixed_content = re.sub(r'0\.0\.0\.0/0', '10.0.0.0/8', fixed_content)
-            issues.append({
-                'severity': 'high',
-                'description': 'Fixed: Replaced 0.0.0.0/0 with 10.0.0.0/8',
-                'fixed': True
-            })
-        
-        # Fix 2: Add encryption to S3 buckets
-        if 'resource "aws_s3_bucket"' in content and 'server_side_encryption_configuration' not in content:
-            bucket_pattern = r'(resource "aws_s3_bucket" "[^"]*" \{[^}]*)\}'
-            encryption_block = '''  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-}'''
-            fixed_content = re.sub(bucket_pattern, r'\1\n' + encryption_block, fixed_content)
-            issues.append({
-                'severity': 'medium',
-                'description': 'Fixed: Added S3 bucket encryption',
-                'fixed': True
-            })
-        
-        # Fix 3: Remove privileged containers
-        if 'privileged: true' in content:
-            fixed_content = re.sub(r'privileged:\s*true', 'privileged: false', fixed_content)
-            issues.append({
-                'severity': 'high', 
-                'description': 'Fixed: Disabled privileged containers',
-                'fixed': True
-            })
-        
-        # Fix 4: Change root user to non-root
-        if 'runAsUser: 0' in content:
-            fixed_content = re.sub(r'runAsUser:\s*0', 'runAsUser: 1000', fixed_content)
-            issues.append({
-                'severity': 'high',
-                'description': 'Fixed: Changed root user to UID 1000',
-                'fixed': True
-            })
-        
-        # Fix 5: Add resource limits to containers
-        if 'containers:' in content and 'resources: {}' in content:
-            resource_limits = '''resources:
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-          requests:
-            memory: "256Mi"
-            cpu: "250m"'''
-            fixed_content = re.sub(r'resources:\s*\{\}', resource_limits, fixed_content)
-            issues.append({
-                'severity': 'medium',
-                'description': 'Fixed: Added container resource limits',
-                'fixed': True
-            })
-        
-        # Use AI for complex fixes if needed
-        if issues and len(fixed_content) != len(original_content):
-            ai_suggestions = self.get_ai_suggestions(original_content, filename)
-            issues.extend(ai_suggestions)
-        
-        return fixed_content, issues
-    
-    def get_ai_suggestions(self, content, filename):
-        """Use Nova Micro for additional security suggestions"""
-        prompt = f"Security fixes for {filename}:\n{content[:500]}\nSuggest 1-2 critical fixes. Brief response:"
-        
+    def ai_analyze_and_fix(self, content, filename):
+        """Pure AI analysis and fixing using Nova Micro"""
+        prompt = f"""Analyze {filename} for security issues and provide fixes.
+
+{content}
+
+Return ONLY valid JSON:
+{{
+  "issues": [{{"severity": "high", "description": "brief issue", "line": 1}}],
+  "fixed_content": "complete fixed file content",
+  "changes_made": ["change 1", "change 2"]
+}}"""
+
         try:
             response = self.bedrock.invoke_model(
                 modelId='amazon.nova-micro-v1:0',
                 body=json.dumps({
-                    'inputText': prompt,
-                    'textGenerationConfig': {
-                        'maxTokenCount': 100,
-                        'temperature': 0.1
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [{"text": prompt}]
+                        }
+                    ],
+                    "inferenceConfig": {
+                        "maxTokens": 1500,
+                        "temperature": 0.1,
+                        "topP": 0.9
                     }
                 })
             )
             
             self.api_calls += 1
             result = json.loads(response['body'].read())
-            suggestion = result['results'][0]['outputText']
+            output_text = result['output']['message']['content'][0]['text']
             
-            return [{
-                'severity': 'medium',
-                'description': f'AI Suggestion: {suggestion[:100]}',
-                'fixed': False
-            }]
+            print(f"🤖 AI analyzing {filename}...")
+            
+            # Better JSON extraction
+            try:
+                # Try to find complete JSON object
+                json_match = re.search(r'\{.*"fixed_content".*\}', output_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    # Clean up common JSON issues
+                    json_str = re.sub(r'```json\s*', '', json_str)
+                    json_str = re.sub(r'\s*```', '', json_str)
+                    ai_result = json.loads(json_str)
+                    return ai_result
+                else:
+                    # Fallback: extract parts manually
+                    issues = []
+                    if 'high' in output_text.lower():
+                        issues.append({
+                            "severity": "high",
+                            "description": "AI detected high severity security issues",
+                            "line": 1
+                        })
+                    
+                    return {
+                        "issues": issues,
+                        "fixed_content": content,
+                        "changes_made": ["AI analysis completed"]
+                    }
+                    
+            except Exception as parse_error:
+                print(f"⚠️ JSON parsing failed: {parse_error}")
+                return {
+                    "issues": [{
+                        "severity": "medium",
+                        "description": f"AI detected security issues in {filename}",
+                        "line": 1
+                    }],
+                    "fixed_content": content,
+                    "changes_made": ["AI analysis completed"]
+                }
             
         except Exception as e:
-            print(f"AI suggestion failed: {e}")
-            return []
+            print(f"❌ AI analysis failed for {filename}: {e}")
+            return {
+                "issues": [],
+                "fixed_content": content,
+                "changes_made": []
+            }
     
-    def apply_fixes_to_file(self, file_path):
-        """Apply fixes to a single file"""
+    def apply_ai_fixes(self, file_path):
+        """Apply AI-generated fixes to file"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
             
-            fixed_content, issues = self.detect_and_fix_issues(original_content, file_path)
+            ai_result = self.ai_analyze_and_fix(original_content, file_path)
             
-            # Write fixed content back to file
-            if fixed_content != original_content:
+            issues = ai_result.get('issues', [])
+            fixed_content = ai_result.get('fixed_content', original_content)
+            changes = ai_result.get('changes_made', [])
+            
+            # Apply AI fixes if content changed significantly
+            if fixed_content != original_content and len(fixed_content) > len(original_content) * 0.5:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(fixed_content)
                 
                 self.fixes_applied.append({
                     'file': file_path,
-                    'issues_fixed': len([i for i in issues if i.get('fixed')])
+                    'issues_fixed': len(issues),
+                    'changes': changes[:3]  # Limit changes for readability
                 })
-                print(f"✅ Fixed {len([i for i in issues if i.get('fixed')])} issues in {file_path}")
+                print(f"✅ AI fixed {len(issues)} issues in {file_path}")
+            else:
+                print(f"ℹ️ No significant fixes for {file_path}")
             
             return issues
             
         except Exception as e:
-            print(f"Error fixing {file_path}: {e}")
+            print(f"❌ Error processing {file_path}: {e}")
             return []
     
     def commit_and_push_fixes(self):
-        """Commit and push fixes back to repo"""
+        """Commit and push AI fixes"""
         if not self.fixes_applied:
+            print("ℹ️ No fixes to commit")
             return
         
         try:
-            # Configure git
             subprocess.run(['git', 'config', 'user.name', 'AI Security Fixer'], check=True)
-            subprocess.run(['git', 'config', 'user.email', 'security-bot@ai-ops.com'], check=True)
+            subprocess.run(['git', 'config', 'user.email', 'ai@security-fixer.com'], check=True)
             
-            # Add fixed files
             for fix in self.fixes_applied:
                 subprocess.run(['git', 'add', fix['file']], check=True)
             
-            # Commit fixes
             total_fixes = sum(fix['issues_fixed'] for fix in self.fixes_applied)
             commit_msg = f"🤖 AI Security Fixes: {total_fixes} issues auto-fixed\n\n"
             
             for fix in self.fixes_applied:
-                commit_msg += f"- {fix['file']}: {fix['issues_fixed']} fixes\n"
+                commit_msg += f"- {fix['file']}: {fix['issues_fixed']} issues\n"
             
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
             
-            # Push to current branch
-            current_branch = subprocess.run(['git', 'branch', '--show-current'], 
-                                          capture_output=True, text=True, check=True).stdout.strip()
-            subprocess.run(['git', 'push', 'origin', current_branch], check=True)
-            
-            print(f"🚀 Pushed {total_fixes} security fixes to {current_branch}")
+            # Get current branch properly
+            try:
+                current_branch = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+                                              capture_output=True, text=True, check=True).stdout.strip()
+                if current_branch and current_branch != 'HEAD':
+                    subprocess.run(['git', 'push', 'origin', current_branch], check=True)
+                    print(f"🚀 Pushed {total_fixes} AI fixes to {current_branch}")
+                else:
+                    print("⚠️ Could not determine branch, skipping push")
+            except:
+                print("⚠️ Push failed, but fixes are committed locally")
             
         except subprocess.CalledProcessError as e:
-            print(f"Git operation failed: {e}")
+            print(f"❌ Git operation failed: {e}")
+    
+    def calculate_costs(self):
+        """Calculate Nova Micro costs"""
+        input_tokens = self.api_calls * 600
+        output_tokens = self.api_calls * 400
+        
+        input_cost = (input_tokens / 1000000) * 35.00
+        output_cost = (output_tokens / 1000000) * 140.00
+        
+        return {
+            'per_scan': round(input_cost + output_cost, 6),
+            'monthly_estimate': round((input_cost + output_cost) * 30, 4),
+            'api_calls': self.api_calls
+        }
     
     def run(self):
-        # Find infrastructure files
         patterns = ['*.tf', '*.yaml', '*.yml']
         files = []
         for pattern in patterns:
             files.extend(glob.glob(pattern))
         
-        files = [f for f in files if os.path.getsize(f) < 5120]  # 5KB limit
-        
-        print(f"🔧 AI Security Fixer: {len(files)} files")
+        print(f"🤖 AI Security Analyzer: {len(files)} files")
         
         all_issues = []
         
         for file_path in files:
-            print(f"Analyzing & Fixing: {file_path}")
-            issues = self.apply_fixes_to_file(file_path)
-            
-            for issue in issues:
-                issue['file'] = file_path
-                all_issues.append(issue)
+            if os.path.getsize(file_path) < 8192:  # 8KB limit
+                issues = self.apply_ai_fixes(file_path)
+                for issue in issues:
+                    issue['file'] = file_path
+                    all_issues.append(issue)
         
-        # Commit and push fixes
         self.commit_and_push_fixes()
         
-        # Calculate costs
-        input_cost = (self.api_calls * 200 / 1000000) * 35.00
-        output_cost = (self.api_calls * 50 / 1000000) * 140.00
-        total_cost = input_cost + output_cost
+        costs = self.calculate_costs()
+        fixed_count = len(self.fixes_applied)
+        total_issues = len(all_issues)
         
-        # Generate summary
-        fixed_count = len([i for i in all_issues if i.get('fixed')])
-        remaining_count = len([i for i in all_issues if not i.get('fixed')])
-        
-        if remaining_count > 0:
-            summary = f"🤖 {fixed_count} issues auto-fixed, {remaining_count} need manual review"
-        else:
-            summary = f"✅ {fixed_count} issues auto-fixed, all clear!"
+        summary = f"🤖 AI: {total_issues} issues found, {fixed_count} files fixed"
         
         results = {
             'summary': summary,
             'issues': all_issues,
             'files_scanned': len(files),
-            'fixes_applied': len(self.fixes_applied),
-            'scan_cost': round(total_cost, 6),
-            'estimated_monthly_cost': round(total_cost * 30, 4)
+            'fixes_applied': fixed_count,
+            'scan_cost': costs['per_scan'],
+            'estimated_monthly_cost': costs['monthly_estimate'],
+            'ai_calls': self.api_calls
         }
         
         with open('security-results.json', 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"\n🤖 AI Security Fixer Results:")
-        print(f"   Files processed: {len(files)}")
-        print(f"   Issues auto-fixed: {fixed_count}")
-        print(f"   Cost: ${round(total_cost, 6)}")
-        print(f"   Fixes pushed to repo: {len(self.fixes_applied)} files")
+        print(f"\n🤖 AI Analysis Complete:")
+        print(f"   Files: {len(files)}")
+        print(f"   AI calls: {self.api_calls}")
+        print(f"   Issues: {total_issues}")
+        print(f"   Fixed: {fixed_count}")
+        print(f"   Cost: ${costs['per_scan']}")
         
-        return remaining_count
+        return len([i for i in all_issues if i.get('severity') == 'high'])
 
 if __name__ == '__main__':
-    fixer = AISecurityFixer()
-    remaining_issues = fixer.run()
-    exit(1 if remaining_issues > 0 else 0)
+    analyzer = PureAISecurityAnalyzer()
+    high_issues = analyzer.run()
+    exit(1 if high_issues > 0 else 0)
