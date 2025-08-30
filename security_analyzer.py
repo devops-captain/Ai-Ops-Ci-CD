@@ -3,9 +3,7 @@ import os
 import json
 import boto3
 import glob
-import subprocess
 import re
-from datetime import datetime
 
 class PureAISecurityAnalyzer:
     def __init__(self):
@@ -150,6 +148,8 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                     'changes': changes
                 })
                 print(f"✅ Applied {len(changes)} fixes to {file_path}")
+                for change in changes:
+                    print(f"   - {change}")
             else:
                 print(f"ℹ️ No changes to apply to {file_path}")
             
@@ -158,64 +158,6 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         except Exception as e:
             print(f"❌ Error processing {file_path}: {e}")
             return []
-    
-    def commit_and_push_fixes(self):
-        """Commit and push AI fixes with better error handling"""
-        if not self.fixes_applied:
-            print("ℹ️ No fixes to commit")
-            return
-        
-        try:
-            # Configure git
-            subprocess.run(['git', 'config', 'user.name', 'AI Security Fixer'], check=True)
-            subprocess.run(['git', 'config', 'user.email', 'ai@security.com'], check=True)
-            
-            # Add files
-            for fix in self.fixes_applied:
-                subprocess.run(['git', 'add', fix['file']], check=True)
-            
-            # Create commit message
-            total_fixes = sum(len(fix['changes']) for fix in self.fixes_applied)
-            commit_msg = f"🤖 AI Security Fixes: {total_fixes} changes applied\n\n"
-            
-            for fix in self.fixes_applied:
-                commit_msg += f"- {fix['file']}: {len(fix['changes'])} changes\n"
-            
-            # Commit
-            subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
-            print(f"✅ Committed {total_fixes} fixes")
-            
-            # Get current branch name more reliably
-            try:
-                # Try multiple methods to get branch name
-                branch_result = subprocess.run(['git', 'branch', '--show-current'], 
-                                             capture_output=True, text=True, check=True)
-                current_branch = branch_result.stdout.strip()
-                
-                if not current_branch:
-                    # Fallback method
-                    branch_result = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
-                                                 capture_output=True, text=True, check=True)
-                    current_branch = branch_result.stdout.strip()
-                
-                if current_branch and current_branch != 'HEAD':
-                    # Try to push
-                    push_result = subprocess.run(['git', 'push', 'origin', current_branch], 
-                                               capture_output=True, text=True)
-                    
-                    if push_result.returncode == 0:
-                        print(f"🚀 Successfully pushed {total_fixes} fixes to {current_branch}")
-                    else:
-                        print(f"⚠️ Push failed but fixes are committed locally")
-                        print(f"Push error: {push_result.stderr}")
-                else:
-                    print(f"⚠️ Could not determine branch name, fixes committed locally")
-                    
-            except subprocess.CalledProcessError as e:
-                print(f"⚠️ Git push failed but fixes are committed: {e}")
-            
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Git commit failed: {e}")
     
     def calculate_costs(self):
         input_tokens = self.api_calls * 700
@@ -247,14 +189,12 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                     issue['file'] = file_path
                     all_issues.append(issue)
         
-        self.commit_and_push_fixes()
-        
         costs = self.calculate_costs()
         fixed_count = len(self.fixes_applied)
         total_issues = len(all_issues)
         
         results = {
-            'summary': f"🤖 AI: {total_issues} issues, {fixed_count} files fixed",
+            'summary': f"🤖 AI: {total_issues} issues analyzed, {fixed_count} files fixed",
             'issues': all_issues,
             'files_scanned': len(files),
             'fixes_applied': fixed_count,
@@ -272,6 +212,9 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         print(f"   Issues: {total_issues}")
         print(f"   Fixed: {fixed_count}")
         print(f"   Cost: ${costs['per_scan']}")
+        
+        if fixed_count > 0:
+            print(f"\n✅ {fixed_count} files modified - workflow will commit and push")
         
         return 0
 
