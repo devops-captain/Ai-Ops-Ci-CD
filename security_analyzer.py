@@ -14,20 +14,12 @@ class PureAISecurityAnalyzer:
         self.fixes_applied = []
         
     def ai_analyze_and_fix(self, content, filename):
-        """Pure AI analysis and fixing using Nova Micro - NO MANUAL RULES"""
-        prompt = f"""You are a security expert. Analyze {filename} and fix ALL security issues.
+        """Pure AI analysis and fixing using Nova Micro"""
+        prompt = f"""Fix security issues in {filename}. Return ONLY valid JSON without any markdown or extra text:
 
-Original file:
 {content}
 
-Provide the complete fixed file content with all security issues resolved.
-
-Return ONLY this JSON:
-{{
-  "issues": [{{"severity": "high", "description": "issue found", "line": 1}}],
-  "fixed_content": "COMPLETE SECURE FILE CONTENT HERE",
-  "changes_made": ["change 1", "change 2"]
-}}"""
+{{"issues":[{{"severity":"high","description":"issue found","line":1}}],"fixed_content":"COMPLETE FIXED FILE CONTENT","changes_made":["change 1"]}}"""
 
         try:
             response = self.bedrock.invoke_model(
@@ -40,7 +32,7 @@ Return ONLY this JSON:
                         }
                     ],
                     "inferenceConfig": {
-                        "maxTokens": 2500,
+                        "maxTokens": 2000,
                         "temperature": 0.1,
                         "topP": 0.9
                     }
@@ -49,63 +41,73 @@ Return ONLY this JSON:
             
             self.api_calls += 1
             result = json.loads(response['body'].read())
-            output_text = result['output']['message']['content'][0]['text']
+            output_text = result['output']['message']['content'][0]['text'].strip()
             
             print(f"🤖 AI analyzing {filename}...")
-            print(f"AI response length: {len(output_text)} chars")
             
-            # Extract JSON from AI response
+            # Clean the response first
+            cleaned_output = output_text
+            # Remove markdown code blocks
+            cleaned_output = re.sub(r'```json\s*', '', cleaned_output)
+            cleaned_output = re.sub(r'```\s*', '', cleaned_output)
+            # Remove any text before first {
+            first_brace = cleaned_output.find('{')
+            if first_brace > 0:
+                cleaned_output = cleaned_output[first_brace:]
+            # Remove any text after last }
+            last_brace = cleaned_output.rfind('}')
+            if last_brace > 0:
+                cleaned_output = cleaned_output[:last_brace + 1]
+            
             try:
-                # Find JSON block more aggressively
-                json_patterns = [
-                    r'\{[^{}]*"fixed_content"[^{}]*"[^"]*"[^{}]*\}',
-                    r'\{.*?"fixed_content".*?\}',
-                    r'\{.*\}'
-                ]
+                # Try to parse the cleaned JSON
+                ai_result = json.loads(cleaned_output)
+                if 'fixed_content' in ai_result and ai_result['fixed_content']:
+                    print(f"✅ Successfully parsed AI JSON response")
+                    return ai_result
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON parsing failed: {e}")
                 
-                for pattern in json_patterns:
-                    json_match = re.search(pattern, output_text, re.DOTALL)
-                    if json_match:
-                        json_str = json_match.group(0)
-                        try:
-                            ai_result = json.loads(json_str)
-                            if 'fixed_content' in ai_result and ai_result['fixed_content']:
-                                print(f"✅ Successfully parsed AI JSON response")
-                                return ai_result
-                        except:
-                            continue
-                
-                # If JSON extraction fails, try to get fixed content directly
-                print("⚠️ JSON parsing failed, extracting content manually")
-                
-                # Look for code blocks or content after "fixed_content"
-                content_patterns = [
-                    r'```(?:terraform|yaml|tf)?\s*(.*?)```',
-                    r'"fixed_content":\s*"([^"]*(?:\\.[^"]*)*)"',
-                    r'Fixed content:\s*(.*?)(?:\n\n|\Z)',
-                ]
-                
-                for pattern in content_patterns:
-                    content_match = re.search(pattern, output_text, re.DOTALL | re.IGNORECASE)
+                # Fallback: Extract content using regex patterns
+                try:
+                    # Try to extract fixed_content value
+                    content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
                     if content_match:
-                        fixed_content = content_match.group(1).strip()
-                        if len(fixed_content) > 50:  # Reasonable content length
-                            print(f"✅ Extracted fixed content ({len(fixed_content)} chars)")
-                            return {
-                                "issues": [{"severity": "high", "description": "AI detected and fixed security issues", "line": 1}],
-                                "fixed_content": fixed_content.replace('\\n', '\n').replace('\\"', '"'),
-                                "changes_made": ["AI applied comprehensive security fixes"]
-                            }
-                
-                print("❌ Could not extract fixed content from AI response")
-                return {
-                    "issues": [{"severity": "medium", "description": "AI analysis completed but no fixes extracted", "line": 1}],
-                    "fixed_content": content,
-                    "changes_made": []
-                }
+                        fixed_content = content_match.group(1)
+                        # Unescape the content
+                        fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                        
+                        print(f"✅ Extracted fixed content using regex")
+                        return {
+                            "issues": [{"severity": "high", "description": "AI detected security issues", "line": 1}],
+                            "fixed_content": fixed_content,
+                            "changes_made": ["AI applied security fixes"]
+                        }
                     
-            except Exception as parse_error:
-                print(f"❌ Content extraction failed: {parse_error}")
+                    # Last resort: look for any code-like content
+                    if len(output_text) > 100:
+                        # Try to find terraform or yaml content
+                        tf_match = re.search(r'resource\s+"[^"]+"\s+"[^"]+"\s*\{.*?\}', output_text, re.DOTALL)
+                        yaml_match = re.search(r'apiVersion:.*?(?=\n\S|\Z)', output_text, re.DOTALL)
+                        
+                        if tf_match:
+                            fixed_content = tf_match.group(0)
+                        elif yaml_match:
+                            fixed_content = yaml_match.group(0)
+                        else:
+                            # Use original content as fallback
+                            fixed_content = content
+                        
+                        return {
+                            "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
+                            "fixed_content": fixed_content,
+                            "changes_made": ["AI processing completed"]
+                        }
+                        
+                except Exception as fallback_error:
+                    print(f"⚠️ Fallback extraction failed: {fallback_error}")
+                
+                # Final fallback
                 return {
                     "issues": [],
                     "fixed_content": content,
@@ -121,7 +123,7 @@ Return ONLY this JSON:
             }
     
     def apply_ai_fixes(self, file_path):
-        """Apply ONLY AI-generated fixes"""
+        """Apply AI-generated fixes"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
@@ -132,7 +134,7 @@ Return ONLY this JSON:
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # Apply AI fixes if we have meaningful changes
+            # Apply fixes if content changed
             if (fixed_content != original_content and 
                 len(fixed_content) > 20 and 
                 len(changes) > 0):
@@ -146,10 +148,8 @@ Return ONLY this JSON:
                     'changes': changes
                 })
                 print(f"✅ AI fixed {len(issues)} issues in {file_path}")
-                for change in changes:
-                    print(f"   - {change}")
             else:
-                print(f"ℹ️ No AI fixes applied to {file_path}")
+                print(f"ℹ️ No changes applied to {file_path}")
             
             return issues
             
@@ -160,23 +160,21 @@ Return ONLY this JSON:
     def commit_and_push_fixes(self):
         """Commit and push AI fixes"""
         if not self.fixes_applied:
-            print("ℹ️ No AI fixes to commit")
+            print("ℹ️ No fixes to commit")
             return
         
         try:
-            subprocess.run(['git', 'config', 'user.name', 'Pure AI Security Fixer'], check=True)
-            subprocess.run(['git', 'config', 'user.email', 'ai@nova-micro.com'], check=True)
+            subprocess.run(['git', 'config', 'user.name', 'Pure AI Fixer'], check=True)
+            subprocess.run(['git', 'config', 'user.email', 'ai@nova.com'], check=True)
             
             for fix in self.fixes_applied:
                 subprocess.run(['git', 'add', fix['file']], check=True)
             
             total_fixes = sum(fix['issues_fixed'] for fix in self.fixes_applied)
-            commit_msg = f"🤖 Pure AI Security Fixes: {total_fixes} issues fixed by Nova Micro\n\n"
+            commit_msg = f"🤖 AI Fixes: {total_fixes} issues resolved\n\n"
             
             for fix in self.fixes_applied:
                 commit_msg += f"- {fix['file']}: {fix['issues_fixed']} issues\n"
-                for change in fix['changes']:
-                    commit_msg += f"  * {change}\n"
             
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
             
@@ -184,15 +182,15 @@ Return ONLY this JSON:
                                           capture_output=True, text=True, check=True).stdout.strip()
             if current_branch:
                 subprocess.run(['git', 'push', 'origin', current_branch], check=True)
-                print(f"🚀 Pushed {total_fixes} pure AI fixes to {current_branch}")
+                print(f"🚀 Pushed {total_fixes} fixes to {current_branch}")
             
         except subprocess.CalledProcessError as e:
-            print(f"❌ Git operation failed: {e}")
+            print(f"❌ Git failed: {e}")
     
     def calculate_costs(self):
-        """Calculate Nova Micro costs"""
-        input_tokens = self.api_calls * 700
-        output_tokens = self.api_calls * 600
+        """Calculate costs"""
+        input_tokens = self.api_calls * 600
+        output_tokens = self.api_calls * 500
         
         input_cost = (input_tokens / 1000000) * 35.00
         output_cost = (output_tokens / 1000000) * 140.00
@@ -210,12 +208,11 @@ Return ONLY this JSON:
             files.extend(glob.glob(pattern))
         
         print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
-        print("Using 100% AI intelligence - NO manual rules")
         
         all_issues = []
         
         for file_path in files:
-            if os.path.getsize(file_path) < 10240:  # 10KB limit
+            if os.path.getsize(file_path) < 8192:
                 issues = self.apply_ai_fixes(file_path)
                 for issue in issues:
                     issue['file'] = file_path
@@ -227,10 +224,8 @@ Return ONLY this JSON:
         fixed_count = len(self.fixes_applied)
         total_issues = len(all_issues)
         
-        summary = f"🤖 Pure AI: {total_issues} issues analyzed, {fixed_count} files fixed"
-        
         results = {
-            'summary': summary,
+            'summary': f"🤖 AI: {total_issues} issues, {fixed_count} files fixed",
             'issues': all_issues,
             'files_scanned': len(files),
             'fixes_applied': fixed_count,
@@ -242,7 +237,7 @@ Return ONLY this JSON:
         with open('security-results.json', 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"\n🤖 Pure AI Analysis Complete:")
+        print(f"\n🤖 Analysis Complete:")
         print(f"   Files: {len(files)}")
         print(f"   AI calls: {self.api_calls}")
         print(f"   Issues: {total_issues}")
