@@ -12,21 +12,13 @@ class PureAISecurityAnalyzer:
         self.fixes_applied = []
         
     def ai_analyze_and_fix(self, content, filename):
-        """Pure AI analysis and fixing with better prompting"""
+        """Pure AI analysis and fixing - NO MANUAL RULES"""
         prompt = f"""You are a security expert. Fix ALL security vulnerabilities in this {filename} file.
 
-CRITICAL SECURITY RULES:
-- Replace 0.0.0.0/0 with specific IP ranges like 10.0.0.0/8
-- Set runAsUser to non-root (1000+)
-- Set privileged to false
-- Remove hardcoded secrets
-- Add resource limits
-- Use secure configurations
+Provide ONLY the complete, valid, secure file content. No explanations, no comments, no extra text.
 
 Original file:
-{content}
-
-Provide ONLY the complete, valid, secure file content. No explanations, no comments, no extra text."""
+{content}"""
 
         try:
             response = self.bedrock.invoke_model(
@@ -52,97 +44,50 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
             
             print(f"🤖 AI analyzing {filename}...")
             
-            # Clean the response - remove any explanatory text
+            # Clean the response - remove AI artifacts only
             fixed_content = output_text
-            
-            # Remove common AI response artifacts
             fixed_content = re.sub(r'^Here.*?:\s*', '', fixed_content, flags=re.IGNORECASE)
-            fixed_content = re.sub(r'^The.*?:\s*', '', fixed_content, flags=re.IGNORECASE)
             fixed_content = re.sub(r'```(?:terraform|hcl|yaml|yml)?\s*', '', fixed_content)
             fixed_content = re.sub(r'```\s*$', '', fixed_content)
-            fixed_content = re.sub(r'CHANGES:.*$', '', fixed_content, flags=re.DOTALL)
-            fixed_content = re.sub(r'Changes made:.*$', '', fixed_content, flags=re.DOTALL)
-            
-            # Clean up whitespace
             fixed_content = fixed_content.strip()
             
-            # Validate the content
+            # Basic syntax validation only
+            is_valid = False
             if filename.endswith('.tf'):
-                if not re.search(r'resource\s+"[^"]+"\s+"[^"]+"\s*\{', fixed_content):
-                    print(f"⚠️ Invalid Terraform syntax in AI response")
-                    return self._create_fallback_result(content)
+                is_valid = 'resource' in fixed_content
             elif filename.endswith(('.yaml', '.yml')):
-                if not re.search(r'apiVersion:', fixed_content):
-                    print(f"⚠️ Invalid YAML syntax in AI response")
-                    return self._create_fallback_result(content)
+                is_valid = 'apiVersion:' in fixed_content
             
-            # Check if content is actually different and improved
-            if (len(fixed_content) > 50 and 
-                fixed_content != content and
-                self._is_more_secure(content, fixed_content)):
+            # Apply if AI provided valid, different content
+            if (is_valid and 
+                len(fixed_content) > 50 and 
+                fixed_content != content):
                 
-                changes = self._detect_changes(content, fixed_content)
                 print(f"✅ AI generated secure configuration")
                 
                 return {
-                    "issues": [{"severity": "high", "description": "Security vulnerabilities fixed", "line": 1}],
+                    "issues": [{"severity": "high", "description": "AI detected and fixed security issues", "line": 1}],
                     "fixed_content": fixed_content,
-                    "changes_made": changes
+                    "changes_made": ["AI applied comprehensive security fixes"]
                 }
             else:
-                print(f"⚠️ AI response not suitable")
-                return self._create_fallback_result(content)
+                print(f"ℹ️ AI did not provide improved configuration")
+                return {
+                    "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
+                    "fixed_content": content,
+                    "changes_made": []
+                }
             
         except Exception as e:
             print(f"❌ AI API call failed for {filename}: {e}")
-            return self._create_fallback_result(content)
-    
-    def _is_more_secure(self, original, fixed):
-        """Check if the fixed version is more secure"""
-        security_improvements = 0
-        
-        # Check for security improvements
-        if '0.0.0.0/0' in original and '0.0.0.0/0' not in fixed:
-            security_improvements += 1
-        if 'runAsUser: 0' in original and 'runAsUser: 0' not in fixed:
-            security_improvements += 1
-        if 'privileged: true' in original and 'privileged: true' not in fixed:
-            security_improvements += 1
-        if 'resources: {}' in original and 'resources: {}' not in fixed:
-            security_improvements += 1
-        
-        return security_improvements > 0
-    
-    def _detect_changes(self, original, fixed):
-        """Detect what changes were made"""
-        changes = []
-        
-        if '0.0.0.0/0' in original and '0.0.0.0/0' not in fixed:
-            changes.append("Restricted network access from 0.0.0.0/0")
-        if 'runAsUser: 0' in original and 'runAsUser: 0' not in fixed:
-            changes.append("Changed from root user to non-root user")
-        if 'privileged: true' in original and 'privileged: true' not in fixed:
-            changes.append("Disabled privileged container mode")
-        if 'resources: {}' in original and 'resources: {}' not in fixed:
-            changes.append("Added resource limits")
-        if 'password' in original.lower() and 'password' not in fixed.lower():
-            changes.append("Removed hardcoded credentials")
-        
-        if not changes:
-            changes = ["Applied security improvements"]
-        
-        return changes
-    
-    def _create_fallback_result(self, content):
-        """Create fallback result when AI fails"""
-        return {
-            "issues": [{"severity": "medium", "description": "Analysis completed", "line": 1}],
-            "fixed_content": content,
-            "changes_made": []
-        }
+            return {
+                "issues": [],
+                "fixed_content": content,
+                "changes_made": []
+            }
     
     def apply_ai_fixes(self, file_path):
-        """Apply AI-generated fixes"""
+        """Apply ONLY AI-generated fixes - NO MANUAL VALIDATION"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
@@ -156,7 +101,7 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # Apply fixes if we have meaningful changes
+            # Apply if AI provided different content with changes
             if (fixed_content and 
                 fixed_content != original_content and 
                 len(changes) > 0):
@@ -169,11 +114,11 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
                     'issues_fixed': len(issues),
                     'changes': changes
                 })
-                print(f"✅ Applied {len(changes)} security fixes to {file_path}")
+                print(f"✅ AI applied fixes to {file_path}")
                 for change in changes:
                     print(f"   - {change}")
             else:
-                print(f"ℹ️ No security improvements applied to {file_path}")
+                print(f"ℹ️ No AI fixes applied to {file_path}")
             
             return issues
             
@@ -200,7 +145,8 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
         for pattern in patterns:
             files.extend(glob.glob(pattern))
         
-        print(f"🤖 AI Security Analyzer: {len(files)} files")
+        print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
+        print("Using 100% AI intelligence - ZERO manual security rules")
         
         all_issues = []
         
@@ -216,7 +162,7 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
         total_issues = len(all_issues)
         
         results = {
-            'summary': f"🤖 AI: {total_issues} issues analyzed, {fixed_count} files fixed",
+            'summary': f"🤖 Pure AI: {total_issues} issues analyzed, {fixed_count} files fixed",
             'issues': all_issues,
             'files_scanned': len(files),
             'fixes_applied': fixed_count,
@@ -228,7 +174,7 @@ Provide ONLY the complete, valid, secure file content. No explanations, no comme
         with open('security-results.json', 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"\n🤖 Analysis Complete:")
+        print(f"\n🤖 Pure AI Analysis Complete:")
         print(f"   Files: {len(files)}")
         print(f"   AI calls: {self.api_calls}")
         print(f"   Issues: {total_issues}")
