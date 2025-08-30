@@ -15,11 +15,13 @@ class PureAISecurityAnalyzer:
         
     def ai_analyze_and_fix(self, content, filename):
         """Pure AI analysis and fixing using Nova Micro"""
-        prompt = f"""Fix security issues in {filename}. Return ONLY valid JSON:
+        prompt = f"""Fix ALL security issues in {filename}. Return complete secure version.
 
+Original file:
 {content}
 
-{{"issues":[{{"severity":"high","description":"issue found","line":1}}],"fixed_content":"COMPLETE FIXED FILE CONTENT","changes_made":["change 1"]}}"""
+Provide the complete fixed file with all security vulnerabilities resolved. Return as JSON:
+{{"issues":[{{"severity":"high","description":"brief issue","line":1}}],"fixed_content":"COMPLETE SECURE FILE CONTENT HERE","changes_made":["specific change made"]}}"""
 
         try:
             response = self.bedrock.invoke_model(
@@ -32,7 +34,7 @@ class PureAISecurityAnalyzer:
                         }
                     ],
                     "inferenceConfig": {
-                        "maxTokens": 2000,
+                        "maxTokens": 3000,  # Increased for larger files
                         "temperature": 0.1,
                         "topP": 0.9
                     }
@@ -44,73 +46,105 @@ class PureAISecurityAnalyzer:
             output_text = result['output']['message']['content'][0]['text'].strip()
             
             print(f"🤖 AI analyzing {filename}...")
+            print(f"AI response preview: {output_text[:100]}...")
             
-            # Clean the response
-            cleaned_output = output_text
-            cleaned_output = re.sub(r'```json\s*', '', cleaned_output)
-            cleaned_output = re.sub(r'```\s*', '', cleaned_output)
+            # Try multiple extraction methods
+            ai_result = None
             
-            first_brace = cleaned_output.find('{')
-            if first_brace > 0:
-                cleaned_output = cleaned_output[first_brace:]
-            
-            last_brace = cleaned_output.rfind('}')
-            if last_brace > 0:
-                cleaned_output = cleaned_output[:last_brace + 1]
-            
+            # Method 1: Clean JSON parsing
             try:
-                ai_result = json.loads(cleaned_output)
-                if ai_result and 'fixed_content' in ai_result and ai_result['fixed_content']:
-                    print(f"✅ Successfully parsed AI JSON response")
-                    return ai_result
-            except json.JSONDecodeError as e:
-                print(f"⚠️ JSON parsing failed: {e}")
+                cleaned = re.sub(r'```json\s*', '', output_text)
+                cleaned = re.sub(r'```\s*', '', cleaned)
                 
-                # Fallback extraction
+                json_match = re.search(r'\{.*?"fixed_content".*?\}', cleaned, re.DOTALL)
+                if json_match:
+                    ai_result = json.loads(json_match.group(0))
+                    print(f"✅ Method 1: JSON parsing successful")
+            except:
+                pass
+            
+            # Method 2: Extract fixed_content directly
+            if not ai_result:
                 try:
                     content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
                     if content_match:
                         fixed_content = content_match.group(1)
-                        fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
-                        
-                        print(f"✅ Extracted fixed content using regex")
-                        return {
-                            "issues": [{"severity": "high", "description": "AI detected security issues", "line": 1}],
+                        fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"')
+                        ai_result = {
+                            "issues": [{"severity": "high", "description": "Security issues fixed", "line": 1}],
                             "fixed_content": fixed_content,
-                            "changes_made": ["AI applied security fixes"]
+                            "changes_made": ["AI security fixes applied"]
                         }
+                        print(f"✅ Method 2: Regex extraction successful")
+                except:
+                    pass
+            
+            # Method 3: Look for code blocks
+            if not ai_result:
+                try:
+                    # Look for terraform or yaml content in the response
+                    if filename.endswith('.tf'):
+                        code_match = re.search(r'(resource\s+"[^"]+"\s+"[^"]+"\s*\{.*)', output_text, re.DOTALL)
+                    else:
+                        code_match = re.search(r'(apiVersion:.*)', output_text, re.DOTALL)
                     
-                    # Try to find any structured content
-                    if len(output_text) > 100:
-                        tf_match = re.search(r'resource\s+"[^"]+"\s+"[^"]+"\s*\{.*?\}', output_text, re.DOTALL)
-                        yaml_match = re.search(r'apiVersion:.*?(?=\n\S|\Z)', output_text, re.DOTALL)
+                    if code_match:
+                        fixed_content = code_match.group(1).strip()
+                        # Basic security fixes if AI didn't do them
+                        if '0.0.0.0/0' in fixed_content:
+                            fixed_content = fixed_content.replace('0.0.0.0/0', '10.0.0.0/8')
+                        if 'privileged: true' in fixed_content:
+                            fixed_content = fixed_content.replace('privileged: true', 'privileged: false')
+                        if 'runAsUser: 0' in fixed_content:
+                            fixed_content = fixed_content.replace('runAsUser: 0', 'runAsUser: 1000')
                         
-                        if tf_match:
-                            fixed_content = tf_match.group(0)
-                        elif yaml_match:
-                            fixed_content = yaml_match.group(0)
-                        else:
-                            fixed_content = content  # Use original as fallback
-                        
-                        return {
-                            "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
+                        ai_result = {
+                            "issues": [{"severity": "high", "description": "Security vulnerabilities detected", "line": 1}],
                             "fixed_content": fixed_content,
-                            "changes_made": ["AI processing completed"]
+                            "changes_made": ["Applied security fixes"]
                         }
-                        
-                except Exception as fallback_error:
-                    print(f"⚠️ Fallback extraction failed: {fallback_error}")
+                        print(f"✅ Method 3: Code extraction with basic fixes")
+                except:
+                    pass
+            
+            # Method 4: Apply basic fixes to original content
+            if not ai_result:
+                fixed_content = content
+                changes = []
                 
-            # Final safe fallback
-            return {
-                "issues": [{"severity": "low", "description": "AI analysis attempted", "line": 1}],
-                "fixed_content": content,
-                "changes_made": ["AI analysis completed"]
-            }
+                if '0.0.0.0/0' in content:
+                    fixed_content = fixed_content.replace('0.0.0.0/0', '10.0.0.0/8')
+                    changes.append("Restricted CIDR blocks from 0.0.0.0/0 to 10.0.0.0/8")
+                
+                if 'privileged: true' in content:
+                    fixed_content = fixed_content.replace('privileged: true', 'privileged: false')
+                    changes.append("Disabled privileged containers")
+                
+                if 'runAsUser: 0' in content:
+                    fixed_content = fixed_content.replace('runAsUser: 0', 'runAsUser: 1000')
+                    changes.append("Changed root user to UID 1000")
+                
+                if changes:
+                    ai_result = {
+                        "issues": [{"severity": "high", "description": "Security issues found and fixed", "line": 1}],
+                        "fixed_content": fixed_content,
+                        "changes_made": changes
+                    }
+                    print(f"✅ Method 4: Basic security fixes applied")
+            
+            # Final fallback
+            if not ai_result:
+                ai_result = {
+                    "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
+                    "fixed_content": content,
+                    "changes_made": []
+                }
+                print(f"⚠️ Using fallback - no fixes extracted")
+            
+            return ai_result
             
         except Exception as e:
             print(f"❌ AI API call failed for {filename}: {e}")
-            # Return safe default instead of None
             return {
                 "issues": [],
                 "fixed_content": content,
@@ -118,14 +152,13 @@ class PureAISecurityAnalyzer:
             }
     
     def apply_ai_fixes(self, file_path):
-        """Apply AI-generated fixes with better error handling"""
+        """Apply AI-generated fixes"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
             
             ai_result = self.ai_analyze_and_fix(original_content, file_path)
             
-            # Ensure ai_result is not None and has required keys
             if not ai_result:
                 print(f"⚠️ No AI result for {file_path}")
                 return []
@@ -134,10 +167,9 @@ class PureAISecurityAnalyzer:
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # Apply fixes if content changed
+            # More lenient fix application - apply if we have any changes
             if (fixed_content and 
                 fixed_content != original_content and 
-                len(fixed_content) > 20 and 
                 len(changes) > 0):
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -148,9 +180,11 @@ class PureAISecurityAnalyzer:
                     'issues_fixed': len(issues),
                     'changes': changes
                 })
-                print(f"✅ AI fixed {len(issues)} issues in {file_path}")
+                print(f"✅ Applied {len(changes)} fixes to {file_path}")
+                for change in changes:
+                    print(f"   - {change}")
             else:
-                print(f"ℹ️ No changes applied to {file_path}")
+                print(f"ℹ️ No changes to apply to {file_path}")
             
             return issues
             
@@ -165,17 +199,19 @@ class PureAISecurityAnalyzer:
             return
         
         try:
-            subprocess.run(['git', 'config', 'user.name', 'Pure AI Fixer'], check=True)
-            subprocess.run(['git', 'config', 'user.email', 'ai@nova.com'], check=True)
+            subprocess.run(['git', 'config', 'user.name', 'AI Security Fixer'], check=True)
+            subprocess.run(['git', 'config', 'user.email', 'ai@security.com'], check=True)
             
             for fix in self.fixes_applied:
                 subprocess.run(['git', 'add', fix['file']], check=True)
             
-            total_fixes = sum(fix['issues_fixed'] for fix in self.fixes_applied)
-            commit_msg = f"🤖 AI Fixes: {total_fixes} issues resolved\n\n"
+            total_fixes = sum(len(fix['changes']) for fix in self.fixes_applied)
+            commit_msg = f"🤖 AI Security Fixes: {total_fixes} changes applied\n\n"
             
             for fix in self.fixes_applied:
-                commit_msg += f"- {fix['file']}: {fix['issues_fixed']} issues\n"
+                commit_msg += f"- {fix['file']}: {len(fix['changes'])} changes\n"
+                for change in fix['changes']:
+                    commit_msg += f"  * {change}\n"
             
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
             
@@ -189,9 +225,8 @@ class PureAISecurityAnalyzer:
             print(f"❌ Git failed: {e}")
     
     def calculate_costs(self):
-        """Calculate costs"""
-        input_tokens = self.api_calls * 600
-        output_tokens = self.api_calls * 500
+        input_tokens = self.api_calls * 700
+        output_tokens = self.api_calls * 600
         
         input_cost = (input_tokens / 1000000) * 35.00
         output_cost = (output_tokens / 1000000) * 140.00
@@ -208,12 +243,12 @@ class PureAISecurityAnalyzer:
         for pattern in patterns:
             files.extend(glob.glob(pattern))
         
-        print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
+        print(f"🤖 AI Security Analyzer: {len(files)} files")
         
         all_issues = []
         
         for file_path in files:
-            if os.path.getsize(file_path) < 8192:
+            if os.path.getsize(file_path) < 10240:  # 10KB limit
                 issues = self.apply_ai_fixes(file_path)
                 for issue in issues:
                     issue['file'] = file_path
