@@ -34,7 +34,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                         }
                     ],
                     "inferenceConfig": {
-                        "maxTokens": 3000,  # Increased for larger files
+                        "maxTokens": 3000,
                         "temperature": 0.1,
                         "topP": 0.9
                     }
@@ -46,7 +46,6 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             output_text = result['output']['message']['content'][0]['text'].strip()
             
             print(f"🤖 AI analyzing {filename}...")
-            print(f"AI response preview: {output_text[:100]}...")
             
             # Try multiple extraction methods
             ai_result = None
@@ -59,7 +58,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                 json_match = re.search(r'\{.*?"fixed_content".*?\}', cleaned, re.DOTALL)
                 if json_match:
                     ai_result = json.loads(json_match.group(0))
-                    print(f"✅ Method 1: JSON parsing successful")
+                    print(f"✅ JSON parsing successful")
             except:
                 pass
             
@@ -75,39 +74,11 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                             "fixed_content": fixed_content,
                             "changes_made": ["AI security fixes applied"]
                         }
-                        print(f"✅ Method 2: Regex extraction successful")
+                        print(f"✅ Regex extraction successful")
                 except:
                     pass
             
-            # Method 3: Look for code blocks
-            if not ai_result:
-                try:
-                    # Look for terraform or yaml content in the response
-                    if filename.endswith('.tf'):
-                        code_match = re.search(r'(resource\s+"[^"]+"\s+"[^"]+"\s*\{.*)', output_text, re.DOTALL)
-                    else:
-                        code_match = re.search(r'(apiVersion:.*)', output_text, re.DOTALL)
-                    
-                    if code_match:
-                        fixed_content = code_match.group(1).strip()
-                        # Basic security fixes if AI didn't do them
-                        if '0.0.0.0/0' in fixed_content:
-                            fixed_content = fixed_content.replace('0.0.0.0/0', '10.0.0.0/8')
-                        if 'privileged: true' in fixed_content:
-                            fixed_content = fixed_content.replace('privileged: true', 'privileged: false')
-                        if 'runAsUser: 0' in fixed_content:
-                            fixed_content = fixed_content.replace('runAsUser: 0', 'runAsUser: 1000')
-                        
-                        ai_result = {
-                            "issues": [{"severity": "high", "description": "Security vulnerabilities detected", "line": 1}],
-                            "fixed_content": fixed_content,
-                            "changes_made": ["Applied security fixes"]
-                        }
-                        print(f"✅ Method 3: Code extraction with basic fixes")
-                except:
-                    pass
-            
-            # Method 4: Apply basic fixes to original content
+            # Method 3: Apply basic fixes
             if not ai_result:
                 fixed_content = content
                 changes = []
@@ -130,7 +101,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                         "fixed_content": fixed_content,
                         "changes_made": changes
                     }
-                    print(f"✅ Method 4: Basic security fixes applied")
+                    print(f"✅ Basic security fixes applied")
             
             # Final fallback
             if not ai_result:
@@ -139,7 +110,6 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                     "fixed_content": content,
                     "changes_made": []
                 }
-                print(f"⚠️ Using fallback - no fixes extracted")
             
             return ai_result
             
@@ -160,14 +130,13 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             ai_result = self.ai_analyze_and_fix(original_content, file_path)
             
             if not ai_result:
-                print(f"⚠️ No AI result for {file_path}")
                 return []
             
             issues = ai_result.get('issues', [])
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # More lenient fix application - apply if we have any changes
+            # Apply fixes if we have changes
             if (fixed_content and 
                 fixed_content != original_content and 
                 len(changes) > 0):
@@ -181,8 +150,6 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                     'changes': changes
                 })
                 print(f"✅ Applied {len(changes)} fixes to {file_path}")
-                for change in changes:
-                    print(f"   - {change}")
             else:
                 print(f"ℹ️ No changes to apply to {file_path}")
             
@@ -193,36 +160,62 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             return []
     
     def commit_and_push_fixes(self):
-        """Commit and push AI fixes"""
+        """Commit and push AI fixes with better error handling"""
         if not self.fixes_applied:
             print("ℹ️ No fixes to commit")
             return
         
         try:
+            # Configure git
             subprocess.run(['git', 'config', 'user.name', 'AI Security Fixer'], check=True)
             subprocess.run(['git', 'config', 'user.email', 'ai@security.com'], check=True)
             
+            # Add files
             for fix in self.fixes_applied:
                 subprocess.run(['git', 'add', fix['file']], check=True)
             
+            # Create commit message
             total_fixes = sum(len(fix['changes']) for fix in self.fixes_applied)
             commit_msg = f"🤖 AI Security Fixes: {total_fixes} changes applied\n\n"
             
             for fix in self.fixes_applied:
                 commit_msg += f"- {fix['file']}: {len(fix['changes'])} changes\n"
-                for change in fix['changes']:
-                    commit_msg += f"  * {change}\n"
             
+            # Commit
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
+            print(f"✅ Committed {total_fixes} fixes")
             
-            current_branch = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
-                                          capture_output=True, text=True, check=True).stdout.strip()
-            if current_branch:
-                subprocess.run(['git', 'push', 'origin', current_branch], check=True)
-                print(f"🚀 Pushed {total_fixes} fixes to {current_branch}")
+            # Get current branch name more reliably
+            try:
+                # Try multiple methods to get branch name
+                branch_result = subprocess.run(['git', 'branch', '--show-current'], 
+                                             capture_output=True, text=True, check=True)
+                current_branch = branch_result.stdout.strip()
+                
+                if not current_branch:
+                    # Fallback method
+                    branch_result = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+                                                 capture_output=True, text=True, check=True)
+                    current_branch = branch_result.stdout.strip()
+                
+                if current_branch and current_branch != 'HEAD':
+                    # Try to push
+                    push_result = subprocess.run(['git', 'push', 'origin', current_branch], 
+                                               capture_output=True, text=True)
+                    
+                    if push_result.returncode == 0:
+                        print(f"🚀 Successfully pushed {total_fixes} fixes to {current_branch}")
+                    else:
+                        print(f"⚠️ Push failed but fixes are committed locally")
+                        print(f"Push error: {push_result.stderr}")
+                else:
+                    print(f"⚠️ Could not determine branch name, fixes committed locally")
+                    
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️ Git push failed but fixes are committed: {e}")
             
         except subprocess.CalledProcessError as e:
-            print(f"❌ Git failed: {e}")
+            print(f"❌ Git commit failed: {e}")
     
     def calculate_costs(self):
         input_tokens = self.api_calls * 700
@@ -248,7 +241,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         all_issues = []
         
         for file_path in files:
-            if os.path.getsize(file_path) < 10240:  # 10KB limit
+            if os.path.getsize(file_path) < 10240:
                 issues = self.apply_ai_fixes(file_path)
                 for issue in issues:
                     issue['file'] = file_path
