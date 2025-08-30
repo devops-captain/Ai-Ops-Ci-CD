@@ -12,14 +12,14 @@ class PureAISecurityAnalyzer:
         self.fixes_applied = []
         
     def ai_analyze_and_fix(self, content, filename):
-        """Pure AI analysis and fixing using Nova Micro"""
-        prompt = f"""Fix ALL security issues in {filename}. Return complete secure version.
+        """Pure AI analysis and fixing using Nova Micro - NO MANUAL RULES"""
+        prompt = f"""You are a security expert. Analyze {filename} and fix ALL security vulnerabilities.
 
 Original file:
 {content}
 
-Provide the complete fixed file with all security vulnerabilities resolved. Return as JSON:
-{{"issues":[{{"severity":"high","description":"brief issue","line":1}}],"fixed_content":"COMPLETE SECURE FILE CONTENT HERE","changes_made":["specific change made"]}}"""
+Return ONLY this JSON format with the complete fixed file:
+{{"issues":[{{"severity":"high","description":"security issue found","line":1}}],"fixed_content":"COMPLETE FIXED FILE CONTENT HERE","changes_made":["specific change made"]}}"""
 
         try:
             response = self.bedrock.invoke_model(
@@ -32,7 +32,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                         }
                     ],
                     "inferenceConfig": {
-                        "maxTokens": 3000,
+                        "maxTokens": 4000,
                         "temperature": 0.1,
                         "topP": 0.9
                     }
@@ -45,82 +45,58 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             
             print(f"🤖 AI analyzing {filename}...")
             
-            # Try multiple extraction methods
-            ai_result = None
-            
-            # Method 1: Clean JSON parsing
+            # Extract JSON from AI response - NO MANUAL FIXES
             try:
+                # Clean response
                 cleaned = re.sub(r'```json\s*', '', output_text)
                 cleaned = re.sub(r'```\s*', '', cleaned)
                 
+                # Find JSON block
                 json_match = re.search(r'\{.*?"fixed_content".*?\}', cleaned, re.DOTALL)
                 if json_match:
                     ai_result = json.loads(json_match.group(0))
-                    print(f"✅ JSON parsing successful")
-            except:
-                pass
-            
-            # Method 2: Extract fixed_content directly
-            if not ai_result:
-                try:
-                    content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
-                    if content_match:
-                        fixed_content = content_match.group(1)
-                        fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"')
-                        ai_result = {
-                            "issues": [{"severity": "high", "description": "Security issues fixed", "line": 1}],
+                    if ai_result.get('fixed_content'):
+                        print(f"✅ AI provided complete fixed content")
+                        return ai_result
+                
+                # Try regex extraction
+                content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
+                if content_match:
+                    fixed_content = content_match.group(1)
+                    fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"')
+                    
+                    if len(fixed_content) > 50:  # Reasonable content length
+                        return {
+                            "issues": [{"severity": "high", "description": "AI detected and fixed security issues", "line": 1}],
                             "fixed_content": fixed_content,
-                            "changes_made": ["AI security fixes applied"]
+                            "changes_made": ["AI applied comprehensive security fixes"]
                         }
-                        print(f"✅ Regex extraction successful")
-                except:
-                    pass
-            
-            # Method 3: Apply basic fixes
-            if not ai_result:
-                fixed_content = content
-                changes = []
                 
-                if '0.0.0.0/0' in content:
-                    fixed_content = fixed_content.replace('0.0.0.0/0', '10.0.0.0/8')
-                    changes.append("Restricted CIDR blocks from 0.0.0.0/0 to 10.0.0.0/8")
-                
-                if 'privileged: true' in content:
-                    fixed_content = fixed_content.replace('privileged: true', 'privileged: false')
-                    changes.append("Disabled privileged containers")
-                
-                if 'runAsUser: 0' in content:
-                    fixed_content = fixed_content.replace('runAsUser: 0', 'runAsUser: 1000')
-                    changes.append("Changed root user to UID 1000")
-                
-                if changes:
-                    ai_result = {
-                        "issues": [{"severity": "high", "description": "Security issues found and fixed", "line": 1}],
-                        "fixed_content": fixed_content,
-                        "changes_made": changes
-                    }
-                    print(f"✅ Basic security fixes applied")
-            
-            # Final fallback
-            if not ai_result:
-                ai_result = {
+                print(f"⚠️ Could not extract valid fixed content from AI")
+                return {
                     "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
-                    "fixed_content": content,
+                    "fixed_content": content,  # Return original - NO MANUAL CHANGES
                     "changes_made": []
                 }
-            
-            return ai_result
+                    
+            except Exception as e:
+                print(f"⚠️ AI response parsing failed: {e}")
+                return {
+                    "issues": [{"severity": "low", "description": "AI analysis attempted", "line": 1}],
+                    "fixed_content": content,  # Return original - NO MANUAL CHANGES
+                    "changes_made": []
+                }
             
         except Exception as e:
             print(f"❌ AI API call failed for {filename}: {e}")
             return {
                 "issues": [],
-                "fixed_content": content,
+                "fixed_content": content,  # Return original - NO MANUAL CHANGES
                 "changes_made": []
             }
     
     def apply_ai_fixes(self, file_path):
-        """Apply AI-generated fixes"""
+        """Apply ONLY AI-generated fixes - NO MANUAL RULES"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
@@ -134,10 +110,11 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
-            # Apply fixes if we have changes
+            # Apply ONLY if AI provided different content with changes
             if (fixed_content and 
                 fixed_content != original_content and 
-                len(changes) > 0):
+                len(changes) > 0 and
+                len(fixed_content) > 50):  # Ensure we have substantial content
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(fixed_content)
@@ -147,11 +124,11 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
                     'issues_fixed': len(issues),
                     'changes': changes
                 })
-                print(f"✅ Applied {len(changes)} fixes to {file_path}")
+                print(f"✅ AI applied {len(changes)} fixes to {file_path}")
                 for change in changes:
                     print(f"   - {change}")
             else:
-                print(f"ℹ️ No changes to apply to {file_path}")
+                print(f"ℹ️ No AI fixes applied to {file_path}")
             
             return issues
             
@@ -160,8 +137,8 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
             return []
     
     def calculate_costs(self):
-        input_tokens = self.api_calls * 700
-        output_tokens = self.api_calls * 600
+        input_tokens = self.api_calls * 800
+        output_tokens = self.api_calls * 700
         
         input_cost = (input_tokens / 1000000) * 35.00
         output_cost = (output_tokens / 1000000) * 140.00
@@ -178,12 +155,13 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         for pattern in patterns:
             files.extend(glob.glob(pattern))
         
-        print(f"🤖 AI Security Analyzer: {len(files)} files")
+        print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
+        print("Using 100% AI intelligence - NO manual rules or fixes")
         
         all_issues = []
         
         for file_path in files:
-            if os.path.getsize(file_path) < 10240:
+            if os.path.getsize(file_path) < 12288:  # 12KB limit
                 issues = self.apply_ai_fixes(file_path)
                 for issue in issues:
                     issue['file'] = file_path
@@ -194,7 +172,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         total_issues = len(all_issues)
         
         results = {
-            'summary': f"🤖 AI: {total_issues} issues analyzed, {fixed_count} files fixed",
+            'summary': f"🤖 Pure AI: {total_issues} issues analyzed, {fixed_count} files fixed",
             'issues': all_issues,
             'files_scanned': len(files),
             'fixes_applied': fixed_count,
@@ -206,7 +184,7 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         with open('security-results.json', 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"\n🤖 Analysis Complete:")
+        print(f"\n🤖 Pure AI Analysis Complete:")
         print(f"   Files: {len(files)}")
         print(f"   AI calls: {self.api_calls}")
         print(f"   Issues: {total_issues}")
@@ -214,7 +192,9 @@ Provide the complete fixed file with all security vulnerabilities resolved. Retu
         print(f"   Cost: ${costs['per_scan']}")
         
         if fixed_count > 0:
-            print(f"\n✅ {fixed_count} files modified - workflow will commit and push")
+            print(f"\n✅ {fixed_count} files modified by AI - ready for workflow to commit")
+        else:
+            print(f"\nℹ️ No files modified - AI analysis complete")
         
         return 0
 
