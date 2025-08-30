@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-service-account
+  namespace: default
+automountServiceAccountToken: true  # COMPLEX: Auto-mounting tokens - context needed
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: app-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["*"]  # COMPLEX: Wildcard verbs - needs context analysis
+- apiGroups: [""]
+  resources: ["secrets"]  # COMPLEX: Broad secret access
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "delete"]  # COMPLEX: Network policy manipulation
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: complex-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: complex-app
+  template:
+    metadata:
+      labels:
+        app: complex-app
+    spec:
+      serviceAccountName: app-service-account
+      hostNetwork: true  # COMPLEX: Host network access - dangerous
+      hostPID: true      # COMPLEX: Host PID namespace sharing
+      
+      containers:
+      - name: main-app
+        image: myapp:latest  # COMPLEX: No tag pinning - security risk
+        
+        securityContext:
+          allowPrivilegeEscalation: true  # COMPLEX: Privilege escalation allowed
+          capabilities:
+            add: ["NET_ADMIN", "SYS_TIME"]  # COMPLEX: Dangerous capabilities
+          readOnlyRootFilesystem: false   # COMPLEX: Writable root filesystem
+        
+        env:
+        - name: DATABASE_URL
+          value: "postgres://admin:secretpass@db:5432/app"  # COMPLEX: Embedded creds
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-key
+              optional: true  # COMPLEX: Optional secret - might not exist
+        
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: false  # COMPLEX: Writable host mount
+        - name: docker-socket
+          mountPath: /var/run/docker.sock  # COMPLEX: Docker socket access
+        
+        ports:
+        - containerPort: 8080
+          hostPort: 8080  # COMPLEX: Host port binding
+        
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /  # COMPLEX: Mounting entire host filesystem
+          type: Directory
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: complex-app-service
+spec:
+  type: NodePort  # COMPLEX: NodePort exposure - context matters
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30080  # COMPLEX: Fixed node port - potential conflict
+  selector:
+    app: complex-app
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-policy
+spec:
+  podSelector: {}  # COMPLEX: Empty selector - affects all pods
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}  # COMPLEX: Empty ingress rule - allows all traffic
+  egress:
+  - {}  # COMPLEX: Empty egress rule - allows all traffic
