@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: nginx:latest
+        
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        
+        env:
+        - name: SECRET_KEY
+          value: "sk-secret123"
+        
+        resources: {}
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: web
