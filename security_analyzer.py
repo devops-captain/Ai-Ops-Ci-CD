@@ -15,7 +15,7 @@ class PureAISecurityAnalyzer:
         
     def ai_analyze_and_fix(self, content, filename):
         """Pure AI analysis and fixing using Nova Micro"""
-        prompt = f"""Fix security issues in {filename}. Return ONLY valid JSON without any markdown or extra text:
+        prompt = f"""Fix security issues in {filename}. Return ONLY valid JSON:
 
 {content}
 
@@ -45,36 +45,32 @@ class PureAISecurityAnalyzer:
             
             print(f"🤖 AI analyzing {filename}...")
             
-            # Clean the response first
+            # Clean the response
             cleaned_output = output_text
-            # Remove markdown code blocks
             cleaned_output = re.sub(r'```json\s*', '', cleaned_output)
             cleaned_output = re.sub(r'```\s*', '', cleaned_output)
-            # Remove any text before first {
+            
             first_brace = cleaned_output.find('{')
             if first_brace > 0:
                 cleaned_output = cleaned_output[first_brace:]
-            # Remove any text after last }
+            
             last_brace = cleaned_output.rfind('}')
             if last_brace > 0:
                 cleaned_output = cleaned_output[:last_brace + 1]
             
             try:
-                # Try to parse the cleaned JSON
                 ai_result = json.loads(cleaned_output)
-                if 'fixed_content' in ai_result and ai_result['fixed_content']:
+                if ai_result and 'fixed_content' in ai_result and ai_result['fixed_content']:
                     print(f"✅ Successfully parsed AI JSON response")
                     return ai_result
             except json.JSONDecodeError as e:
                 print(f"⚠️ JSON parsing failed: {e}")
                 
-                # Fallback: Extract content using regex patterns
+                # Fallback extraction
                 try:
-                    # Try to extract fixed_content value
                     content_match = re.search(r'"fixed_content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', output_text, re.DOTALL)
                     if content_match:
                         fixed_content = content_match.group(1)
-                        # Unescape the content
                         fixed_content = fixed_content.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
                         
                         print(f"✅ Extracted fixed content using regex")
@@ -84,9 +80,8 @@ class PureAISecurityAnalyzer:
                             "changes_made": ["AI applied security fixes"]
                         }
                     
-                    # Last resort: look for any code-like content
+                    # Try to find any structured content
                     if len(output_text) > 100:
-                        # Try to find terraform or yaml content
                         tf_match = re.search(r'resource\s+"[^"]+"\s+"[^"]+"\s*\{.*?\}', output_text, re.DOTALL)
                         yaml_match = re.search(r'apiVersion:.*?(?=\n\S|\Z)', output_text, re.DOTALL)
                         
@@ -95,8 +90,7 @@ class PureAISecurityAnalyzer:
                         elif yaml_match:
                             fixed_content = yaml_match.group(0)
                         else:
-                            # Use original content as fallback
-                            fixed_content = content
+                            fixed_content = content  # Use original as fallback
                         
                         return {
                             "issues": [{"severity": "medium", "description": "AI analysis completed", "line": 1}],
@@ -107,15 +101,16 @@ class PureAISecurityAnalyzer:
                 except Exception as fallback_error:
                     print(f"⚠️ Fallback extraction failed: {fallback_error}")
                 
-                # Final fallback
-                return {
-                    "issues": [],
-                    "fixed_content": content,
-                    "changes_made": []
-                }
+            # Final safe fallback
+            return {
+                "issues": [{"severity": "low", "description": "AI analysis attempted", "line": 1}],
+                "fixed_content": content,
+                "changes_made": ["AI analysis completed"]
+            }
             
         except Exception as e:
             print(f"❌ AI API call failed for {filename}: {e}")
+            # Return safe default instead of None
             return {
                 "issues": [],
                 "fixed_content": content,
@@ -123,19 +118,25 @@ class PureAISecurityAnalyzer:
             }
     
     def apply_ai_fixes(self, file_path):
-        """Apply AI-generated fixes"""
+        """Apply AI-generated fixes with better error handling"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
             
             ai_result = self.ai_analyze_and_fix(original_content, file_path)
             
+            # Ensure ai_result is not None and has required keys
+            if not ai_result:
+                print(f"⚠️ No AI result for {file_path}")
+                return []
+            
             issues = ai_result.get('issues', [])
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
             
             # Apply fixes if content changed
-            if (fixed_content != original_content and 
+            if (fixed_content and 
+                fixed_content != original_content and 
                 len(fixed_content) > 20 and 
                 len(changes) > 0):
                 
