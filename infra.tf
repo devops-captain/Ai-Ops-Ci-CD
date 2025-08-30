@@ -1,18 +1,20 @@
 resource "aws_security_group" "app" {
-  name = "app-sg"
+  name        = "app-sg"
+  description = "Security group for the application"
+  vpc_id      = var.vpc_id
   
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["<your-ip>/32"]
   }
   
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["<your-ip>/32"]
   }
   
   egress {
@@ -47,6 +49,12 @@ resource "aws_s3_bucket" "storage" {
       storage_class = "GLACIER"
     }
   }
+  
+  block_public_access {
+    block_public_acls       = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+  }
 }
 
 resource "aws_instance" "server" {
@@ -66,9 +74,11 @@ resource "aws_instance" "server" {
   
   user_data = <<-EOF
     #!/bin/bash
-    echo "root:password" | chpasswd
+    echo "root:$(aws sts get-caller-identity | jq -r .Account)" | chpasswd
     echo "password" | passwd --stdin $USER
   EOF
   
   security_groups = [aws_security_group.app.id]
+  
+  key_name = var.key_name
 }

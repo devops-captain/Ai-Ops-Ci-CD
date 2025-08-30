@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "public_data" {
   bucket = "public-app-data"
+  
   server_side_encryption_configuration = {
     Rule = {
       ApplyServerSideEncryptionByDefault = {
@@ -9,6 +10,12 @@ resource "aws_s3_bucket" "public_data" {
   }
   
   acl = "private"
+  block_public_access_settings = {
+    block_public_acls = true
+    ignore_public_acls = true
+    block_public_policy = true
+    restrict_public_buckets = true
+  }
 }
 
 resource "aws_s3_bucket_policy" "public_access" {
@@ -19,15 +26,10 @@ resource "aws_s3_bucket_policy" "public_access" {
       {
         Effect = "Allow"
         Principal = {
-          AWS = ["*"]
+          AWS = []
         }
         Action = "s3:GetObject"
         Resource = "${aws_s3_bucket.public_data.arn}/*"
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "true"
-          }
-        }
       }
     ]
   })

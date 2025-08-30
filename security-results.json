@@ -23,13 +23,13 @@
       "severity": "high",
       "description": "AI detected and fixed security issues",
       "line": 1,
-      "file": "microservice.yaml"
+      "file": "deploy.yaml"
     },
     {
       "severity": "high",
       "description": "AI detected and fixed security issues",
       "line": 1,
-      "file": "deploy.yaml"
+      "file": "microservice.yaml"
     }
   ],
   "files_scanned": 5,
