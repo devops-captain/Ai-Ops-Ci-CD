@@ -25,28 +25,34 @@ class PureAISecurityAnalyzer:
 Response format:
 {{
   "issues": [
-    {{"severity": "high|medium|low", "description": "issue description", "line": 1}}
+    {{"severity": "high", "description": "issue description", "line": 1}}
   ],
   "fixed_content": "complete fixed file content here",
   "changes_made": ["change 1", "change 2"]
 }}"""
 
         try:
+            # Correct Nova Micro API format
             response = self.bedrock.invoke_model(
                 modelId='amazon.nova-micro-v1:0',
                 body=json.dumps({
-                    'inputText': prompt,
-                    'textGenerationConfig': {
-                        'maxTokenCount': 2000,  # Increased for full file content
-                        'temperature': 0.1,
-                        'topP': 0.9
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [{"text": prompt}]
+                        }
+                    ],
+                    "inferenceConfig": {
+                        "maxTokens": 2000,
+                        "temperature": 0.1,
+                        "topP": 0.9
                     }
                 })
             )
             
             self.api_calls += 1
             result = json.loads(response['body'].read())
-            output_text = result['results'][0]['outputText']
+            output_text = result['output']['message']['content'][0]['text']
             
             print(f"🤖 AI Response for {filename}:")
             print(f"Raw output: {output_text[:200]}...")
@@ -60,8 +66,8 @@ Response format:
                     json_str = output_text[start:end]
                     ai_result = json.loads(json_str)
                     return ai_result
-            except:
-                pass
+            except Exception as parse_error:
+                print(f"⚠️ JSON parsing failed: {parse_error}")
             
             # Fallback: Create basic response if JSON parsing fails
             return {
