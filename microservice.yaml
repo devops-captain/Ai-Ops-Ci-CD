@@ -12,37 +12,34 @@ spec:
       labels:
         app: api
     spec:
-      hostNetwork: true
-      hostPID: true
-      
+      hostNetwork: false
+      hostPID: false
+      securityContext:
+        fsGroup: 2000
+        runAsUser: 1000
+        runAsGroup: 3000
       containers:
       - name: api
         image: node:16
-        
         securityContext:
-          runAsUser: 0
-          privileged: true
-          allowPrivilegeEscalation: true
-        
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
         env:
         - name: DB_PASSWORD
-          value: "supersecret123"
+          valueFrom:
+            secretKeyRef:
+              name: db-password
+              key: password
         - name: JWT_SECRET
-          value: "my-jwt-key"
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
         - name: API_KEY
-          value: "sk-1234567890"
-        
+          valueFrom:
+            secretKeyRef:
+              name: api-key
+              key: key
         ports:
         - containerPort: 3000
-          hostPort: 3000
-        
-        volumeMounts:
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
-        
-        resources: {}
-        
-      volumes:
-      - name: docker-socket
-        hostPath:
-          path: /var/run/docker.sock
+      volumes: []

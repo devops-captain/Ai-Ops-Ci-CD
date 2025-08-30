@@ -5,14 +5,14 @@ resource "aws_security_group" "app" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["<your-ip>/32"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
   
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["<your-ip>/32"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
   
   egress {
@@ -31,6 +31,20 @@ resource "aws_s3_bucket" "storage" {
       apply_server_side_encryption_by_default {
         sse_algorithm = "AES256"
       }
+    }
+  }
+  
+  versioning {
+    enabled = true
+  }
+  
+  lifecycle_rule {
+    enabled = true
+    id      = "log-deletions"
+    
+    transition {
+      days = 30
+      storage_class = "GLACIER"
     }
   }
 }
@@ -52,6 +66,9 @@ resource "aws_instance" "server" {
   
   user_data = <<-EOF
     #!/bin/bash
-    echo "" > /etc/passwd
+    echo "root:password" | chpasswd
+    echo "password" | passwd --stdin $USER
   EOF
+  
+  security_groups = [aws_security_group.app.id]
 }

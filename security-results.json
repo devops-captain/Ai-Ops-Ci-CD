@@ -1,5 +1,5 @@
 {
-  "summary": "\ud83e\udd16 Pure AI: 2 issues analyzed, 2 files fixed",
+  "summary": "\ud83e\udd16 Pure AI: 5 issues analyzed, 5 files fixed",
   "issues": [
     {
       "severity": "high",
@@ -11,12 +11,30 @@
       "severity": "high",
       "description": "AI detected and fixed security issues",
       "line": 1,
+      "file": "storage.tf"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "database.tf"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "microservice.yaml"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
       "file": "deploy.yaml"
     }
   ],
-  "files_scanned": 2,
-  "fixes_applied": 2,
-  "scan_cost": 0.217,
-  "estimated_monthly_cost": 6.51,
-  "ai_calls": 2
+  "files_scanned": 5,
+  "fixes_applied": 5,
+  "scan_cost": 0.5425,
+  "estimated_monthly_cost": 16.275,
+  "ai_calls": 5
 }

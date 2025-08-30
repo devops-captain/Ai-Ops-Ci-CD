@@ -1,17 +1,35 @@
 resource "aws_s3_bucket" "public_data" {
   bucket = "public-app-data"
+  server_side_encryption_configuration = {
+    Rule = {
+      ApplyServerSideEncryptionByDefault = {
+        SSEAlgorithm = "AES256"
+      }
+    }
+  }
+  
+  acl = "private"
 }
 
 resource "aws_s3_bucket_policy" "public_access" {
   bucket = aws_s3_bucket.public_data.id
   
   policy = jsonencode({
-    Statement = [{
-      Effect = "Allow"
-      Principal = "*"
-      Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-      Resource = "${aws_s3_bucket.public_data.arn}/*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = ["*"]
+        }
+        Action = "s3:GetObject"
+        Resource = "${aws_s3_bucket.public_data.arn}/*"
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "true"
+          }
+        }
+      }
+    ]
   })
 }
 
@@ -27,11 +45,18 @@ resource "aws_iam_policy" "admin_policy" {
   name = "service-admin-policy"
   
   policy = jsonencode({
-    Statement = [{
-      Effect = "Allow"
-      Action = "*"
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.public_data.arn}",
+          "${aws_s3_bucket.public_data.arn}/*"
+        ]
+      }
+    ]
   })
 }
 
