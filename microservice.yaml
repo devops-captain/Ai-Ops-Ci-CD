@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      hostNetwork: true
+      hostPID: true
+      
+      containers:
+      - name: api
+        image: node:16
+        
+        securityContext:
+          runAsUser: 0
+          privileged: true
+          allowPrivilegeEscalation: true
+        
+        env:
+        - name: DB_PASSWORD
+          value: "supersecret123"
+        - name: JWT_SECRET
+          value: "my-jwt-key"
+        - name: API_KEY
+          value: "sk-1234567890"
+        
+        ports:
+        - containerPort: 3000
+          hostPort: 3000
+        
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        
+        resources: {}
+        
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
