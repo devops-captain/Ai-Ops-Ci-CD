@@ -1,4 +1,4 @@
-name: AI Security Fixer
+name: Ultra-Cheap Security Scan
 
 on:
   pull_request:
@@ -10,17 +10,16 @@ on:
     branches: [main]
 
 jobs:
-  ai-security-fixer:
+  security-scan:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Need write access to push fixes
+      contents: read
       pull-requests: write
 
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
+        fetch-depth: 2  # For git diff
 
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -37,10 +36,10 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: AI Security Analysis & Auto-Fix
-      run: python security_analyzer.py
+    - name: Ultra-Cheap Security Analysis
+      run: python security_analyzer_ultra_cheap.py
 
-    - name: Comment PR with Results
+    - name: Comment PR
       if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
       with:
@@ -49,26 +48,17 @@ jobs:
           if (fs.existsSync('security-results.json')) {
             const results = JSON.parse(fs.readFileSync('security-results.json', 'utf8'));
             
-            let comment = `## 🤖 AI Security Fixer Results\n\n`;
+            let comment = `## 💰 Ultra-Cheap Security Scan\n\n`;
             comment += `${results.summary}\n\n`;
             
-            if (results.fixes_applied > 0) {
-              comment += `### ✅ Auto-Fixed Issues\n`;
-              results.issues.filter(i => i.fixed).forEach(issue => {
-                comment += `- **${issue.severity.toUpperCase()}** in \`${issue.file}\`: ${issue.description}\n`;
-              });
-              comment += `\n🚀 **${results.fixes_applied} files automatically updated and pushed!**\n\n`;
-            }
-            
-            const remaining = results.issues.filter(i => !i.fixed);
-            if (remaining.length > 0) {
-              comment += `### ⚠️ Manual Review Needed\n`;
-              remaining.forEach(issue => {
-                comment += `- **${issue.severity.toUpperCase()}** in \`${issue.file}\`: ${issue.description}\n`;
+            if (results.issues.length > 0) {
+              results.issues.forEach(issue => {
+                comment += `🚨 **${issue.severity.toUpperCase()}** \`${issue.file}\` line ${issue.line}\n`;
+                comment += `   ${issue.description}\n\n`;
               });
             }
             
-            comment += `\n💰 **Cost:** $${results.scan_cost} (Monthly: $${results.estimated_monthly_cost})`;
+            comment += `💸 **Cost:** $${results.scan_cost} (Monthly: $${results.estimated_monthly_cost})`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
