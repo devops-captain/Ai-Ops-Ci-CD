@@ -15,15 +15,16 @@ spec:
       hostNetwork: false
       hostPID: false
       securityContext:
-        fsGroup: 2000
         runAsUser: 1000
         runAsGroup: 3000
+        fsGroup: 2000
       containers:
       - name: api
         image: node:16
         securityContext:
           runAsUser: 1000
           allowPrivilegeEscalation: false
+          allowPrivileges: false
         env:
         - name: DB_PASSWORD
           valueFrom:
@@ -42,4 +43,11 @@ spec:
               key: key
         ports:
         - containerPort: 3000
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
       volumes: []
