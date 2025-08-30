@@ -1,57 +1,62 @@
-# Production infrastructure with complex security vulnerabilities
 resource "aws_security_group" "web_tier" {
   name        = "production-web"
   description = "Web tier security group"
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # SSH open to world
-  }
-
-  ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["<your-allowed-ip>/32"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Database port open to world
-  }
-
-  ingress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Redis open to world
+    cidr_blocks = ["<your-allowed-ip>/32"]
   }
 }
 
 resource "aws_s3_bucket" "app_data" {
   bucket = "production-app-data-${random_id.bucket.hex}"
-  # Missing encryption, versioning, and access controls
+
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        bucket_key_enabled = false
+        sse_algorithm     = "AES256"
+      }
+    }
+  }
+
+  versioning {
+    enabled = true
+  }
+
+  lifecycle_rule {
+    id      = "log-delivery-write"
+    enabled = true
+
+    abort_incomplete_multipart_upload_days = 7
+
+    prefix = ""
+
+    expiration {
+      days = 365
+    }
+  }
 }
 
-resource "aws_s3_bucket_policy" "public_read" {
+resource "aws_s3_bucket_policy" "private_read" {
   bucket = aws_s3_bucket.app_data.id
   
   policy = jsonencode({
     Statement = [{
       Effect = "Allow"
-      Principal = "*"  # Public access
-      Action = ["s3:GetObject", "s3:ListBucket"]
+      Principal = {
+        AWS = ["<your-allowed-account-id>"]
+      }
+      Action = ["s3:GetObject"]
       Resource = [
         "${aws_s3_bucket.app_data.arn}",
         "${aws_s3_bucket.app_data.arn}/*"
@@ -68,7 +73,7 @@ resource "aws_iam_role" "app_role" {
       Action = "sts:AssumeRole"
       Effect = "Allow"
       Principal = {
-        Service = "*"  # Overly broad principal
+        Service = "ec2.amazonaws.com"
       }
     }]
   })
@@ -81,13 +86,14 @@ resource "aws_iam_policy" "app_permissions" {
     Statement = [
       {
         Effect = "Allow"
-        Action = "*"  # Full admin access
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = "iam:*"  # IAM admin access
-        Resource = "*"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "${aws_s3_bucket.app_data.arn}",
+          "${aws_s3_bucket.app_data.arn}/*"
+        ]
       }
     ]
   })
@@ -101,37 +107,51 @@ resource "aws_instance" "web_server" {
   
   user_data = <<-EOF
     #!/bin/bash
-    export DB_PASSWORD="SuperSecret123!"
-    export API_KEY="sk-1234567890abcdef"
-    export JWT_SECRET="my-super-secret-key"
-    
     # Install and configure services
-    mysql -u root -p"admin123" -e "CREATE DATABASE app;"
   EOF
   
-  # No encryption, monitoring, or backup
+  tags = {
+    Name = "production-web-server"
+  }
 }
 
 resource "aws_db_instance" "primary" {
   identifier = "production-db"
   
   engine         = "mysql"
-  engine_version = "5.7"  # Outdated version
-  instance_class = "db.t3.micro"
+  engine_version = "8.0"  # Updated version
+  instance_class = "db.m5.large"
   
   allocated_storage = 20
-  storage_encrypted = false  # No encryption
+  storage_encrypted = true  # Encryption enabled
   
   db_name  = "production"
   username = "admin"
-  password = "password123"  # Hardcoded weak password
+  password = var.db_password  # Use a secure variable
   
   vpc_security_group_ids = [aws_security_group.web_tier.id]
   
   skip_final_snapshot = true
-  publicly_accessible = true  # Database accessible from internet
+  publicly_accessible = false  # Database not accessible from internet
 }
 
 resource "random_id" "bucket" {
   byte_length = 4
 }
+
+`,
+  "changes_made": [
+    "Closed SSH port",
+    "Limited HTTP and HTTPS to specific IP",
+    "Closed database and Redis ports",
+    "Enabled S3 bucket encryption and versioning",
+    "Restricted S3 bucket policy to specific account",
+    "Limited IAM role to EC2 service",
+    "Removed full admin access from IAM policy",
+    "Removed hardcoded secrets from user data",
+    "Enabled RDS encryption",
+    "Used secure variable for database password",
+    "Restricted database access"
+  ]
+}
+```
