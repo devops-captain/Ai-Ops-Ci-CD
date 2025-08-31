@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = var.db_password
+  password           = ashish
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -52,11 +52,7 @@ resource "aws_kms_key" "db_key" {
   description = "KMS key for encrypting database"
 }
 
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
-}
+
 
 variable "allowed_cidr" {
   description = "Allowed CIDR for database access"
