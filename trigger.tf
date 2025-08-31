@@ -21,10 +21,11 @@ resource "aws_instance" "trigger" {
 
   provisioner "local-exec" {
     command = "echo ${var.secret} > /secret && chmod 600 /secret"
-    when    = create
+    when    = "create"
     environment = {
       SECRET = var.secret
     }
+    interpreter = ["bash", "-c"]
   }
 
   depends_on = [aws_security_group_rule.allow_ssh]
