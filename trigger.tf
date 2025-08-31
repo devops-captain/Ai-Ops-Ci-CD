@@ -6,7 +6,7 @@ resource "aws_instance" "trigger" {
   
   user_data = <<-EOF
     #!/bin/bash
-    echo "export SECRET=${var.secret}" >> /etc/environment
+    echo "${var.user_data_commands}" >> /etc/environment
   EOF
 
   tags = {
@@ -19,17 +19,12 @@ resource "aws_instance" "trigger" {
 
   source_dest_check = false
 
-  dynamic "user_data" {
-    for_each = [var.user_data_commands]
-    
-    content {
-      content = user_data.value
-    }
-  }
-
   provisioner "local-exec" {
     command = "echo ${var.secret} > /secret && chmod 600 /secret"
     when    = create
+    environment = {
+      SECRET = var.secret
+    }
   }
 
   depends_on = [aws_security_group_rule.allow_ssh]

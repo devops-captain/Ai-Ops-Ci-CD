@@ -25,6 +25,14 @@ spec:
           runAsUser: 1000
           allowPrivilegeEscalation: false
           allowPrivileges: false
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - -f
+              - http://localhost:3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
         env:
         - name: DB_PASSWORD
           valueFrom:
@@ -50,4 +58,10 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
       volumes: []
