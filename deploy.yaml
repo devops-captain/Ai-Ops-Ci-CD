@@ -41,12 +41,6 @@ spec:
             port: 80
           initialDelaySeconds: 30
           periodSeconds: 10
-        securityContext:
-          allowPrivilegeEscalation: false
-          privileged: false
-          runAsUser: 1000
-          runAsGroup: 3000
-          runAsNonRoot: true
 ---
 apiVersion: v1
 kind: Service
@@ -60,3 +54,4 @@ spec:
   selector:
     app: web
   type: LoadBalancer
+  externalTrafficPolicy: Cluster

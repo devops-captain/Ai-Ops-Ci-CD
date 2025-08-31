@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = "ashish123!"  # Password should be hashed and managed securely
+  password           = var.db_password  # Password should be hashed and managed securely
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -31,6 +31,7 @@ resource "aws_db_instance" "main" {
   # Additional security settings
   skip_name_resolve = true
   backup_role       = "arn:aws:iam::123456789012:role/RDSCustomRole"
+  deletion_protection = false
 }
 
 resource "aws_security_group" "db" {
@@ -54,6 +55,12 @@ resource "aws_security_group" "db" {
 
 resource "aws_kms_key" "db_key" {
   description = "KMS key for encrypting database"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
 }
 
 variable "allowed_cidr" {
