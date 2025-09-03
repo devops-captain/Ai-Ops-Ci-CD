@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = var.db_password  # Password should be hashed and managed securely
+  password           = var.db_password
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -19,7 +19,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted       = true
   kms_key_id              = aws_kms_key.db_key.arn
 
-  multi_az                = false
+  multi_az                = true
   storage_type            = "io1"
   iops                    = 100
 
@@ -31,7 +31,7 @@ resource "aws_db_instance" "main" {
   # Additional security settings
   skip_name_resolve = true
   backup_role       = "arn:aws:iam::123456789012:role/RDSCustomRole"
-  deletion_protection = false
+  deletion_protection = true
 }
 
 resource "aws_security_group" "db" {
@@ -42,7 +42,7 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {

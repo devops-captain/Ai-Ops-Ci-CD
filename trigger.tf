@@ -34,6 +34,8 @@ resource "aws_instance" "trigger" {
   lifecycle {
     create_before_destroy = true
   }
+
+  security_groups = ["sg-12345"]
 }
 
 variable "secret" {

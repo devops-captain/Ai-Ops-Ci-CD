@@ -15,9 +15,9 @@ spec:
       hostNetwork: false
       hostPID: false
       securityContext:
-        fsGroup: 2000
         runAsUser: 1000
         runAsGroup: 3000
+        fsGroup: 3000
       containers:
       - name: api
         image: node:16
