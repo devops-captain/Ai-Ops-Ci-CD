@@ -27,24 +27,31 @@ resource "aws_db_instance" "main" {
     Environment = "production"
     CreatedBy   = "terraform"
   }
+
+  # Security enhancements
+  skip_final_snapshot = true
+  deletion_protection  = false
 }
 
 resource "aws_security_group" "db" {
   name        = "database-sg"
   description = "Security group for database"
 
+  # Security enhancements
+  vpc_id = aws_vpc.main.id
+
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/16"]
+    cidr_blocks = ["<your-cidr>/32"] # Replace with your actual CIDR
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/16"]
+    cidr_blocks = "0.0.0.0/0"
   }
 }
 
@@ -56,4 +63,8 @@ variable "db_password" {
   description = "Database password"
   type        = string
   sensitive   = true
+}
+
+resource "aws_vpc" "main" {
+  cidr_block = "<your-vpc-cidr>" # Replace with your actual VPC CIDR
 }

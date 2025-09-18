@@ -16,6 +16,21 @@ resource "aws_s3_bucket" "public_data" {
     block_public_policy = true
     restrict_public_buckets = true
   }
+  
+  versioning {
+    enabled = true
+  }
+  
+  lifecycle_rule {
+    id      = "log-deletion-requests"
+    enabled = true
+    
+    abort_incomplete_multipart_upload_days = 7
+    
+    expiration {
+      days = 365
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "public_access" {
@@ -24,12 +39,15 @@ resource "aws_s3_bucket_policy" "public_access" {
   policy = jsonencode({
     Statement = [
       {
-        Effect = "Allow"
-        Principal = {
-          AWS = []
-        }
+        Effect = "Deny"
+        Principal = "*"
         Action = "s3:GetObject"
         Resource = "${aws_s3_bucket.public_data.arn}/*"
+        Condition = {
+          StringEquals = {
+            "aws:Referer" = "https://your-allowed-domain.com"
+          }
+        }
       }
     ]
   })
@@ -37,10 +55,16 @@ resource "aws_s3_bucket_policy" "public_access" {
 
 resource "aws_iam_user" "service_user" {
   name = "service-user"
+  
+  tags = {
+    Environment = "production"
+  }
 }
 
 resource "aws_iam_access_key" "service_key" {
   user = aws_iam_user.service_user.name
+  
+  depends_on = [aws_iam_user.service_user]
 }
 
 resource "aws_iam_policy" "admin_policy" {
