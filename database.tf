@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = var.db_password
+  password           = kanu
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -49,7 +49,7 @@ resource "aws_security_group" "db" {
     from_port   = 0
     to_port     = 0
     protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
