@@ -43,6 +43,13 @@ spec:
           periodSeconds: 10
       hostNetwork: false
       subnets: []
+      dnsPolicy: Default
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        runAsNonRoot: true
+        privileged: false
+      volumes: []
 ---
 apiVersion: v1
 kind: Service
@@ -58,3 +65,4 @@ spec:
   externalTrafficPolicy: Cluster
   loadBalancerSourceRanges:
   - 0.0.0.0/0
+  publishNotReadyAddresses: false
