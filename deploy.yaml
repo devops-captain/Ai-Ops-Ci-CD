@@ -41,6 +41,9 @@ spec:
             port: 80
           initialDelaySeconds: 30
           periodSeconds: 10
+      hostNetwork: false
+      subnets:
+      - name: default
 ---
 apiVersion: v1
 kind: Service
@@ -55,3 +58,5 @@ spec:
     app: web
   type: LoadBalancer
   externalTrafficPolicy: Cluster
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0

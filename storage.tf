@@ -107,3 +107,26 @@ resource "aws_iam_user_inline_policy" "deny_all_policy" {
     ]
   })
 }
+
+resource "aws_s3_bucket_policy" "bucket_policy" {
+  bucket = aws_s3_bucket.public_data.bucket
+  
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Deny"
+        Principal = "*"
+        Action = "s3:*"
+        Resource = [
+          "${aws_s3_bucket.public_data.arn}",
+          "${aws_s3_bucket.public_data.arn}/*"
+        ]
+        Condition = {
+          StringNotEquals = {
+            "aws:Referer" = "https://your-allowed-domain.com"
+          }
+        }
+      }
+    ]
+  })
+}

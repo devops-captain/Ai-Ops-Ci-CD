@@ -29,6 +29,13 @@ resource "aws_db_instance" "main" {
   }
 
   deletion_protection  = true
+
+  # Security enhancements
+  skip_final_snapshot = true
+  backup_retention_period = 7
+  preferred_backup_window = "03:00-04:00"
+  multi_az = false
+  skip_final_snapshot = true
 }
 
 resource "aws_security_group" "db" {
@@ -41,7 +48,8 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = "10.0.0.0/16" # Replace with your actual CIDR
+    cidr_blocks = "0.0.0.0/0"
+    security_groups = [aws_security_group.allowed_sg.id] # Add allowed security groups here
   }
 
   egress {
@@ -60,3 +68,23 @@ resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16" # Replace with your actual VPC CIDR
 }
 
+resource "aws_security_group" "allowed_sg" {
+  name        = "allowed-sg"
+  description = "Security group for allowed traffic"
+
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = "0.0.0.0/0"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = "0.0.0.0/0"
+  }
+}

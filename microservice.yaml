@@ -24,7 +24,8 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           allowPrivileges: false
-          runAsUser: 1000
+          runAsNonRoot: true
+          runAsUser: 1001
         readinessProbe:
           failureThreshold: 3
           httpGet:
