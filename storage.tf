@@ -45,6 +45,12 @@ resource "aws_s3_bucket" "public_data" {
             "aws:Referer" = "https://your-allowed-domain.com"
           }
         }
+      },
+      {
+        Effect = "Allow"
+        Principal = { Service = "s3.amazonaws.com" }
+        Action = "s3:GetBucketLocation"
+        Resource = "${aws_s3_bucket.public_data.arn}"
       }
     ]
   })
@@ -86,4 +92,18 @@ resource "aws_iam_policy" "admin_policy" {
 resource "aws_iam_user_policy_attachment" "admin_attach" {
   user       = aws_iam_user.service_user.name
   policy_arn = aws_iam_policy.admin_policy.arn
+}
+
+resource "aws_iam_user_inline_policy" "deny_all_policy" {
+  user = aws_iam_user.service_user.name
+  name = "deny-all-policy"
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Deny"
+        Action = "*"
+        Resource = "*"
+      }
+    ]
+  })
 }
