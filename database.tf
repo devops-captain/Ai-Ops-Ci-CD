@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = var.db_password
+  password           = dddd
   publicly_accessible = false
   skip_final_snapshot = true
 
