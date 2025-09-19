@@ -60,8 +60,3 @@ resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16" # Replace with your actual VPC CIDR
 }
 
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
-}
