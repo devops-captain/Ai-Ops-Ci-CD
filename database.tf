@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = ashishkasaudhan
+  password           = var.db_password
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -41,14 +41,14 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Replace with your actual CIDR
+    cidr_blocks = "10.0.0.0/16" # Replace with your actual CIDR
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "tcp"
-    cidr_blocks = "<your-cidr>" # Replace with your actual CIDR
+    cidr_blocks = "0.0.0.0/0"
   }
 }
 
@@ -57,7 +57,7 @@ resource "aws_kms_key" "db_key" {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block = "<your-vpc-cidr>" # Replace with your actual VPC CIDR
+  cidr_block = "10.0.0.0/16" # Replace with your actual VPC CIDR
 }
 
 variable "db_password" {
