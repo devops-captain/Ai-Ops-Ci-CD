@@ -1,5 +1,5 @@
 {
-  "summary": "\ud83e\udd16 Pure AI: 5 issues analyzed, 5 files fixed",
+  "summary": "\ud83e\udd16 Pure AI: 5 issues analyzed, 4 files fixed",
   "issues": [
     {
       "severity": "high",
@@ -8,8 +8,8 @@
       "file": "infra.tf"
     },
     {
-      "severity": "high",
-      "description": "AI detected and fixed security issues",
+      "severity": "medium",
+      "description": "AI analysis completed",
       "line": 1,
       "file": "storage.tf"
     },
@@ -33,7 +33,7 @@
     }
   ],
   "files_scanned": 5,
-  "fixes_applied": 5,
+  "fixes_applied": 4,
   "scan_cost": 0.5425,
   "estimated_monthly_cost": 16.275,
   "ai_calls": 5

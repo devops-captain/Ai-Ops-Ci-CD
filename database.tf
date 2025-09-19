@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = seemaji
+  password           = var.db_password
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -29,13 +29,6 @@ resource "aws_db_instance" "main" {
   }
 
   deletion_protection  = true
-
-  # Security enhancements
-  skip_final_snapshot = true
-  backup_retention_period = 7
-  preferred_backup_window = "03:00-04:00"
-  multi_az = false
-  skip_final_snapshot = true
 }
 
 resource "aws_security_group" "db" {
@@ -49,7 +42,6 @@ resource "aws_security_group" "db" {
     to_port     = 3306
     protocol    = "tcp"
     cidr_blocks = "0.0.0.0/0"
-    security_groups = [aws_security_group.allowed_sg.id] # Add allowed security groups here
   }
 
   egress {
@@ -75,8 +67,8 @@ resource "aws_security_group" "allowed_sg" {
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port   = 0
-    to_port     = 0
+    from_port   = 3306
+    to_port     = 3306
     protocol    = "tcp"
     cidr_blocks = "0.0.0.0/0"
   }
@@ -87,4 +79,10 @@ resource "aws_security_group" "allowed_sg" {
     protocol    = "tcp"
     cidr_blocks = "0.0.0.0/0"
   }
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
 }
