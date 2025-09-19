@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = helloworld
+  password           = var.db_password
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -28,39 +28,40 @@ resource "aws_db_instance" "main" {
     CreatedBy   = "terraform"
   }
 
-  # Security enhancements
-  skip_final_snapshot = true
-  deletion_protection  = false
+  deletion_protection  = true
 }
 
 resource "aws_security_group" "db" {
   name        = "database-sg"
   description = "Security group for database"
 
-  # Security enhancements
   vpc_id = aws_vpc.main.id
 
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Replace with your actual CIDR
+    cidr_blocks = ["<your-cidr>"] # Replace with your actual CIDR
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = "<your-cidr>" # Replace with your actual CIDR
   }
 }
 
 resource "aws_kms_key" "db_key" {
-  description             = "KMS key for encrypting database"
+  description = "KMS key for encrypting database"
 }
-
-
 
 resource "aws_vpc" "main" {
   cidr_block = "<your-vpc-cidr>" # Replace with your actual VPC CIDR
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
 }

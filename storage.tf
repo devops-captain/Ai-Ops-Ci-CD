@@ -4,7 +4,8 @@ resource "aws_s3_bucket" "public_data" {
   server_side_encryption_configuration = {
     Rule = {
       ApplyServerSideEncryptionByDefault = {
-        SSEAlgorithm = "AES256"
+        SSEAlgorithm = "aws:kms"
+        KMSMasterKeyID = "alias/aws/s3"  # Use AWS managed key for SSE
       }
     }
   }
@@ -31,10 +32,6 @@ resource "aws_s3_bucket" "public_data" {
       days = 365
     }
   }
-}
-
-resource "aws_s3_bucket_policy" "public_access" {
-  bucket = aws_s3_bucket.public_data.id
   
   policy = jsonencode({
     Statement = [
