@@ -7,7 +7,7 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = var.db_password
+  password           = seema
   publicly_accessible = false
   skip_final_snapshot = true
 
@@ -79,10 +79,4 @@ resource "aws_security_group" "allowed_sg" {
     protocol    = "tcp"
     cidr_blocks = "0.0.0.0/0"
   }
-}
-
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
 }
