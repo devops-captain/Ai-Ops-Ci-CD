@@ -7,11 +7,11 @@ resource "aws_db_instance" "main" {
   storage_encrypted  = true
   db_name            = "app"
   username           = "admin"
-  password           = seema
+  password           = var.password
   publicly_accessible = false
   skip_final_snapshot = true
 
-  vpc_security_group_ids = [aws_security_group.db.id]
+  vpc_security_group_ids = [aws_security_group.allowed_sg.id]
   parameter_group_name   = "default.mysql8.0"
 
   backup_retention_period = 7
@@ -70,7 +70,7 @@ resource "aws_security_group" "allowed_sg" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = var.allowed_ip_range
   }
 
   egress {
@@ -79,4 +79,15 @@ resource "aws_security_group" "allowed_sg" {
     protocol    = "tcp"
     cidr_blocks = "0.0.0.0/0"
   }
+}
+
+variable "password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}
+
+variable "allowed_ip_range" {
+  description = "Allowed IP range for database access"
+  type        = string
 }
