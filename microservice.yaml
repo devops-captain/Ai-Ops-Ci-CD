@@ -34,22 +34,13 @@ spec:
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
-        env:
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: db-password
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: secret
-              name: jwt-secret
-        - name: API_KEY
-          valueFrom:
-            secretKeyRef:
-              key: key
-              name: api-key
+        envFrom:
+        - secretRef:
+            name: db-password
+        - secretRef:
+            name: jwt-secret
+        - secretRef:
+            name: api-key
         ports:
         - containerPort: 3000
         resources:

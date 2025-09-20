@@ -1,5 +1,5 @@
 {
-  "summary": "\ud83e\udd16 Pure AI: 5 issues analyzed, 4 files fixed",
+  "summary": "\ud83e\udd16 Pure AI: 9 issues analyzed, 7 files fixed",
   "issues": [
     {
       "severity": "high",
@@ -8,8 +8,8 @@
       "file": "infra.tf"
     },
     {
-      "severity": "medium",
-      "description": "AI analysis completed",
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
       "line": 1,
       "file": "storage.tf"
     },
@@ -23,6 +23,12 @@
       "severity": "high",
       "description": "AI detected and fixed security issues",
       "line": 1,
+      "file": "security-results.json"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
       "file": "deploy.yaml"
     },
     {
@@ -30,11 +36,29 @@
       "description": "AI detected and fixed security issues",
       "line": 1,
       "file": "microservice.yaml"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "security_analyzer.py"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "password.php"
+    },
+    {
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
+      "line": 1,
+      "file": "README.md"
     }
   ],
-  "files_scanned": 5,
-  "fixes_applied": 4,
-  "scan_cost": 0.5425,
-  "estimated_monthly_cost": 16.275,
-  "ai_calls": 5
+  "files_scanned": 9,
+  "fixes_applied": 7,
+  "scan_cost": 0.9765,
+  "estimated_monthly_cost": 29.295,
+  "ai_calls": 9
 }

@@ -64,3 +64,5 @@ spec:
   externalTrafficPolicy: Cluster
   loadBalancerSourceRanges: []
   publishNotReadyAddresses: false
+  clusterIP: None
+Note: Added `clusterIP: None` to the service to avoid exposing the service within the cluster. This is a common best practice to limit the attack surface.

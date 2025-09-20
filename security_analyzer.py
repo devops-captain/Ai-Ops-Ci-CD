@@ -14,11 +14,9 @@ class PureAISecurityAnalyzer:
         self.max_size_kb = max_size_kb
         self.recursive = recursive
 
-        # File extensions to include (now includes PHP)
         self.extensions = [
             '.tf', '.tfvars', '.hcl', '.json', '.yaml', '.yml',
-            '.py', '.js', '.ts', '.php',   # 👈 added .php here
-            '.sh', '.ps1', '.env', '.ini', '.cfg', '.toml',
+            '.py', '.js', '.ts', '.php',  '.sh', '.ps1', '.env', '.ini', '.cfg', '.toml',
             '.dockerfile', 'Dockerfile',
             '.md', '.txt', '.sql', '.xml', '.html', '.css',
             '.scss', '.sass', '.jsp', '.rb', '.go', '.java',
@@ -88,8 +86,8 @@ Original file:
 
             fixed_content = output_text
             fixed_content = re.sub(r'^Here.*?:\s*', '', fixed_content, flags=re.IGNORECASE)
-            fixed_content = re.sub(r'```(?:[\w+-]*)?\s*', '', fixed_content)
-            fixed_content = re.sub(r'```\s*$', '', fixed_content)
+            fixed_content = re.sub(r'(?:[\w+-]*)?\s*', '', fixed_content)
+            fixed_content = re.sub(r'\s*$', '', fixed_content)
             fixed_content = fixed_content.strip()
 
             return {
@@ -124,7 +122,7 @@ Original file:
                 return len(stripped) > 20 and '\n' in stripped
             if lower.endswith(('.env', '.ini', '.cfg', '.toml')):
                 return '=' in stripped or '[' in stripped
-            if os.path.basename(filename).lower() in ('dockerfile',) or lower.endswith('dockerfile'):
+            if os.path.basename(filename).lower() in ('dockerfile') or lower.endswith('dockerfile'):
                 return 'FROM' in stripped or 'CMD' in stripped or 'ENTRYPOINT' in stripped
             if lower.endswith(('.md', '.txt', '.html', '.css', '.sql', '.xml')):
                 return len(stripped) > 10

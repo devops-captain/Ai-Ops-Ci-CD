@@ -4,10 +4,7 @@ Automated security analysis for Terraform, Kubernetes, and Helm configurations u
 
 ## 🚀 Quick Deploy
 
-```bash
 ./deploy.sh
-```
-
 ## 💰 Cost Breakdown
 
 - **AWS Bedrock**: $0.01-$0.05 per scan
@@ -16,24 +13,19 @@ Automated security analysis for Terraform, Kubernetes, and Helm configurations u
 
 ## 🏗️ Architecture
 
-```
 GitHub PR → Actions → Python Script → AWS Bedrock → Security Report
-```
-
 ## 📋 Setup
 
 1. **Deploy AWS resources:**
-   ```bash
    ./deploy.sh
-   ```
-
-2. **Enable Bedrock model:**
+   2. **Enable Bedrock model:**
    - AWS Console → Bedrock → Model Access
    - Enable "Anthropic Claude 3 Sonnet"
 
 3. **Add GitHub secrets:**
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
+   - **Note:** Never expose secrets in the README.md file. Use GitHub Secrets management instead.
 
 ## 🔍 Detects
 

@@ -29,6 +29,9 @@ resource "aws_db_instance" "main" {
   }
 
   deletion_protection  = true
+  skip_final_snapshot = true
+
+  storage_encrypted = true
 }
 
 resource "aws_security_group" "db" {
@@ -41,7 +44,7 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = aws_security_group.allowed_sg.cidr_block # Restrict to allowed security group
   }
 
   egress {
