@@ -1,13 +1,21 @@
 <?php
-// hardcoded_print.php
-// WARNING: for local/demo use only. Do NOT hardcode real credentials in production.
+// password.php - demo file
 
-$username = 'admin';
-$password = 'P@ssw0rd!';
+// Hardcoded credentials (for testing purposes)
+$username = "admin";
+$password = "P@ssw0rd!";
 
-// Safe-ish echo: escape to avoid XSS if this ever runs in a browser
-function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+// Simple login simulation
+function checkLogin($user, $pass) {
+    $correctUser = "admin";
+    $correctPass = "P@ssw0rd!";
+    
+    if ($user === $correctUser && $pass === $correctPass) {
+        return "Login successful!";
+    } else {
+        return "Invalid credentials!";
+    }
+}
 
-echo "Username: " . e($username) . "<br>";
-echo "Password: " . e($password) . "<br>";
-?>
+// Test login
+echo checkLogin($username, $password);
