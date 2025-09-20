@@ -1,4 +1,3 @@
-python
 #!/usr/bin/env python3
 import os
 import json
@@ -12,6 +11,7 @@ class PureAISecurityAnalyzer:
         self.api_calls = 0
         self.fixes_applied = []
 
+        # Supported file extensions (now includes PHP)
         self.extensions = [
             '.tf', '.tfvars', '.hcl', '.json', '.yaml', '.yml',
             '.py', '.js', '.ts', '.php',
@@ -23,6 +23,7 @@ class PureAISecurityAnalyzer:
         ]
 
     def ai_analyze_and_fix(self, content, filename):
+        """Pure AI analysis and fixing - NO MANUAL RULES"""
         prompt = f"""You are a security expert. Fix ALL security vulnerabilities in this {filename} file.
 
 Provide ONLY the complete, valid, secure file content. No explanations, no comments, no extra text.
@@ -54,12 +55,14 @@ Original file:
 
             print(f"🤖 AI analyzing {filename}...")
 
+            # Clean the response
             fixed_content = output_text
             fixed_content = re.sub(r'^Here.*?:\s*', '', fixed_content, flags=re.IGNORECASE)
-            fixed_content = re.sub(r'(?:terraform|hcl|yaml|yml|php|json|xml|html)?\s*', '', fixed_content)
-            fixed_content = re.sub(r'\s*$', '', fixed_content)
+            fixed_content = re.sub(r'```(?:terraform|hcl|yaml|yml|php|json|xml|html)?\s*', '', fixed_content)
+            fixed_content = re.sub(r'```\s*$', '', fixed_content)
             fixed_content = fixed_content.strip()
 
+            # Basic syntax validation only
             is_valid = self.basic_validation(fixed_content, filename)
 
             if (is_valid and
@@ -89,6 +92,7 @@ Original file:
             }
 
     def basic_validation(self, stripped, filename):
+        """Very lightweight sanity checks by file type"""
         lower = filename.lower()
         if lower.endswith('.tf'):
             return 'resource' in stripped or 'provider' in stripped
@@ -101,6 +105,7 @@ Original file:
         return True
 
     def apply_ai_fixes(self, file_path):
+        """Apply ONLY AI-generated fixes - NO MANUAL VALIDATION"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
@@ -114,10 +119,12 @@ Original file:
             fixed_content = ai_result.get('fixed_content', original_content)
             changes = ai_result.get('changes_made', [])
 
+            # Apply if AI provided different content with changes
             if (fixed_content and
                 fixed_content != original_content and
                 len(changes) > 0):
 
+                # Backup before overwriting
                 backup_path = file_path + ".bak"
                 with open(backup_path, 'w', encoding='utf-8') as f:
                     f.write(original_content)
@@ -162,6 +169,11 @@ Original file:
 
         print(f"🤖 Pure AI Security Analyzer: {len(files)} files")
         print("Using 100% AI intelligence - ZERO manual security rules")
+
+        # Debug: list PHP files found
+        for f in files:
+            if f.endswith('.php'):
+                print(f"👉 PHP file detected: {f}")
 
         all_issues = []
 

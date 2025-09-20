@@ -15,16 +15,17 @@ spec:
       hostNetwork: false
       hostPID: false
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        readOnlyRootFilesystem: true
+        fsGroup: 1001
       containers:
       - name: api
         image: node:16
         securityContext:
           allowPrivilegeEscalation: false
           allowPrivileges: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          readOnlyRootFilesystem: true
         readinessProbe:
           failureThreshold: 3
           httpGet:
