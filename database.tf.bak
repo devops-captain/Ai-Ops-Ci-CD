@@ -11,15 +11,11 @@ resource "aws_db_instance" "main" {
   publicly_accessible = false
   skip_final_snapshot = true
 
-  vpc_security_group_ids = [aws_security_group.allowed_sg.id]
+  vpc_security_group_ids = [aws_security_group.db.id]
   parameter_group_name   = "default.mysql8.0"
 
   backup_retention_period = 7
   preferred_backup_window = "03:00-04:00"
-  storage_encrypted       = true
-  kms_key_id              = aws_kms_key.db_key.arn
-
-  multi_az                = false
   storage_type            = "io1"
   iops                    = 100
 
@@ -30,8 +26,9 @@ resource "aws_db_instance" "main" {
 
   deletion_protection  = true
   skip_final_snapshot = true
-
-  storage_encrypted = true
+  storage_encrypted   = true
+  kms_key_id          = aws_kms_key.db_key.arn
+  multi_az            = false
 }
 
 resource "aws_security_group" "db" {

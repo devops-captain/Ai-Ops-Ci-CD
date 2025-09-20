@@ -8,8 +8,8 @@
       "file": "infra.tf"
     },
     {
-      "severity": "high",
-      "description": "AI detected and fixed security issues",
+      "severity": "medium",
+      "description": "AI analysis completed",
       "line": 1,
       "file": "storage.tf"
     },
@@ -44,8 +44,8 @@
       "file": "security_analyzer.py"
     },
     {
-      "severity": "high",
-      "description": "AI detected and fixed security issues",
+      "severity": "medium",
+      "description": "AI analysis completed",
       "line": 1,
       "file": "password.php"
     },
