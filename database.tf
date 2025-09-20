@@ -11,7 +11,7 @@ resource "aws_db_instance" "main" {
   publicly_accessible = false
   skip_final_snapshot = true
 
-  vpc_security_group_ids = [aws_security_group.db.id]
+  vpc_security_group_ids = [aws_security_group.allowed_sg.id]
   parameter_group_name   = "default.mysql8.0"
 
   backup_retention_period = 7
@@ -29,6 +29,11 @@ resource "aws_db_instance" "main" {
   }
 
   deletion_protection  = true
+
+  # Additional security settings
+  skip_final_snapshot = true
+  backup_retention_period = 7
+  preferred_backup_window = "03:00-04:00"
 }
 
 resource "aws_security_group" "db" {
@@ -70,7 +75,7 @@ resource "aws_security_group" "allowed_sg" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = "10.0.0.0/16" # Restrict to VPC CIDR
   }
 
   egress {
