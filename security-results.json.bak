@@ -8,8 +8,8 @@
       "file": "infra.tf"
     },
     {
-      "severity": "medium",
-      "description": "AI analysis completed",
+      "severity": "high",
+      "description": "AI detected and fixed security issues",
       "line": 1,
       "file": "storage.tf"
     },
@@ -38,8 +38,8 @@
       "file": "microservice.yaml"
     },
     {
-      "severity": "high",
-      "description": "AI detected and fixed security issues",
+      "severity": "medium",
+      "description": "AI analysis completed",
       "line": 1,
       "file": "security_analyzer.py"
     },
