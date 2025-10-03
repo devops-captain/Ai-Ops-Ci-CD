@@ -445,6 +445,27 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
             'compliance_violations': list(compliance_violations)
         }
     
+    def upload_to_s3(self, report):
+        """Upload report to S3 for web dashboard"""
+        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
+        if not s3_bucket:
+            return
+        
+        try:
+            s3 = boto3.client('s3', region_name=self.region)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            key = f"reports/{timestamp}_compliance_report.json"
+            
+            s3.put_object(
+                Bucket=s3_bucket,
+                Key=key,
+                Body=json.dumps(report, indent=2),
+                ContentType='application/json'
+            )
+            print(f"📤 Report uploaded to s3://{s3_bucket}/{key}")
+        except Exception as e:
+            print(f"⚠️ Failed to upload to S3: {e}")
+
     def log_error(self, message):
         """Log errors securely"""
         with open('error_log.txt', 'a') as log_file:
@@ -547,6 +568,9 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         with open('compliance_report.json', 'w') as f:
             json.dump(report, f, indent=2)
+        
+        # Upload to S3 if configured
+        self.upload_to_s3(report)
         
         print(f"\n📄 Report: compliance_report.json")
         

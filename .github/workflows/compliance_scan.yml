@@ -65,6 +65,7 @@ jobs:
         AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
         BEDROCK_KB_ID: ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}
         BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
+        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
@@ -74,6 +75,9 @@ jobs:
         echo "Using AWS Region: $AWS_REGION"
         echo "Using KB ID: $BEDROCK_KB_ID"
         echo "Using Model: $BEDROCK_MODEL_ID"
+        if [ -n "$REPORTS_S3_BUCKET" ]; then
+          echo "Reports will be uploaded to: s3://$REPORTS_S3_BUCKET"
+        fi
         python src/compliance_scanner.py $SCAN_ARGS
     
     - name: Generate PR Comment
