@@ -49,7 +49,7 @@ resource "aws_db_instance" "insecure_db" {
   instance_class          = "db.t3.micro"
   name                    = "insecuredb"
   username                = "admin"
-  password                = "Password123"     # ❌ Hardcoded weak password
+  password                = "Password12389"     # ❌ Hardcoded weak password
   skip_final_snapshot     = true
   publicly_accessible     = true              # ❌ Database exposed to the internet
   storage_encrypted       = false             # ❌ No encryption at rest
