@@ -138,6 +138,10 @@ jobs:
                     comment += `   📄 *RFC Document: ${issue.rfc_document}*\n`;
                   }
                   
+                  if (issue.s3_sources && issue.s3_sources.length > 0) {
+                    comment += `   🗂️ *S3 Sources: ${issue.s3_sources.join(', ')}*\n`;
+                  }
+                  
                   if (issue.kb_rule) {
                     comment += `   📚 *KB Rule: ${issue.kb_rule}*\n`;
                   }

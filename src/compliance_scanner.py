@@ -197,10 +197,24 @@ Return ONLY the JSON array."""
                 json_str = output[json_start:json_end]
                 issues = json.loads(json_str)
                 
-                # Validate issues have required fields
+                # Validate issues and add S3 source information
                 valid_issues = []
                 for issue in issues:
                     if isinstance(issue, dict) and 'line' in issue and 'severity' in issue:
+                        # Add S3 source information from KB query
+                        if kb_info['rfc_sources']:
+                            issue['s3_sources'] = kb_info['rfc_sources']
+                            # Extract document names from S3 paths
+                            doc_names = []
+                            for s3_path in kb_info['rfc_sources']:
+                                if 's3://' in s3_path:
+                                    doc_name = s3_path.split('/')[-1]  # Get filename
+                                    doc_names.append(doc_name)
+                                elif s3_path:  # Any other path format
+                                    doc_names.append(s3_path)
+                            if doc_names:
+                                issue['rfc_document'] = ', '.join(doc_names)
+                        
                         valid_issues.append(issue)
                 
                 return valid_issues
