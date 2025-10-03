@@ -107,9 +107,52 @@ jobs:
               }
             }
             
+            // Add detailed issues breakdown
+            if (report.results && report.results.length > 0) {
+              comment += `\n### 🚨 Detailed Issues\n\n`;
+              
+              // Group issues by file
+              const fileGroups = {};
+              for (const result of report.results) {
+                if (result.issues && result.issues.length > 0) {
+                  fileGroups[result.filepath] = result.issues;
+                }
+              }
+              
+              for (const [filepath, issues] of Object.entries(fileGroups)) {
+                comment += `#### 📁 \`${filepath}\`\n`;
+                
+                // Sort by severity (critical first)
+                const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+                issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+                
+                for (const issue of issues.slice(0, 10)) { // Limit to 10 issues per file
+                  const emoji = issue.severity === 'critical' ? '🔴' : issue.severity === 'high' ? '🟠' : issue.severity === 'medium' ? '🟡' : '🟢';
+                  comment += `${emoji} **Line ${issue.line}** (${issue.severity.toUpperCase()}): ${issue.description}\n`;
+                  
+                  if (issue.compliance_violations && issue.compliance_violations.length > 0) {
+                    comment += `   📋 *Violates: ${issue.compliance_violations.join(', ')}*\n`;
+                  }
+                  
+                  if (issue.remediation) {
+                    comment += `   🔧 *Fix: ${issue.remediation}*\n`;
+                  }
+                  comment += `\n`;
+                }
+                
+                if (issues.length > 10) {
+                  comment += `   *... and ${issues.length - 10} more issues*\n\n`;
+                }
+              }
+            }
+            
             if (report.by_severity.critical > 0) {
-              comment += `\n### ❌ Critical Issues Found\n`;
-              comment += `**${report.by_severity.critical} critical** security issues must be fixed before merging.\n`;
+              comment += `### ❌ Critical Issues Found\n`;
+              comment += `**${report.by_severity.critical} critical** security issues must be fixed before merging.\n\n`;
+              comment += `**Action Required:**\n`;
+              comment += `1. Review the critical issues listed above\n`;
+              comment += `2. Apply the suggested fixes\n`;
+              comment += `3. Re-run the scan to verify fixes\n`;
             }
           } else {
             comment += `Scan completed but no detailed report available.\n`;
