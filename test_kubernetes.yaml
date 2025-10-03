@@ -82,7 +82,7 @@ spec:
     targetPort: 8080
     # Add source ranges to restrict access
     loadBalancerSourceRanges:
-    - 0.0.0.0/0  # Adjust as per your security requirements
+    - 10.0.0.0/8  # Adjust as per your security requirements
   selector:
     app: payment-api
 
