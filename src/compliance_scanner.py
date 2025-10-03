@@ -104,25 +104,29 @@ Context:
         return language, framework
     
     def compliance_detect(self, code, language, framework, filepath):
-        """Compliance-focused detection using AI"""
+        """Compliance-focused detection using AI with accurate line numbers"""
         framework_text = f"/{framework}" if framework else ""
         
+        # Add line numbers to code for accuracy
+        lines = code.split('\n')
+        numbered_code = '\n'.join([f"{i+1:3d}: {line}" for i, line in enumerate(lines)])
+        
         # Pure AI prompt - no hardcoded patterns
-        prompt = f"""You are a security expert. Analyze this {language}{framework_text} code for compliance violations using your knowledge of security standards.
+        prompt = f"""You are a security expert. Analyze this {language}{framework_text} code for compliance violations.
 
-Use your expertise in: PCI-DSS, SOC2, HIPAA, GDPR, OWASP Top 10
+CRITICAL: Use EXACT line numbers from the numbered code below. Only report real issues on actual lines.
 
-Return JSON array with exact line numbers:
+Return JSON array:
 [{{"line": <exact_line_number>, "severity": "critical|high|medium|low", 
 "category": "<type>", "description": "<what_you_found>", "cvss": <score>, 
 "compliance_violations": ["<standard>"], "remediation": "<fix>"}}]
 
-Code from {filepath}:
+Code from {filepath} with line numbers:
 ```
-{code}
+{numbered_code}
 ```
 
-IMPORTANT: Return ONLY the JSON array, no other text."""
+Return ONLY the JSON array."""
 
         output = self.call_ai_with_compliance(prompt)
         if not output:
@@ -132,9 +136,8 @@ IMPORTANT: Return ONLY the JSON array, no other text."""
             # Clean and extract JSON
             output = output.strip()
             if '```' in output:
-                # Remove code blocks
-                lines = output.split('\n')
-                output = '\n'.join([l for l in lines if not l.strip().startswith('```')])
+                lines_out = output.split('\n')
+                output = '\n'.join([l for l in lines_out if not l.strip().startswith('```')])
             
             if '[' in output and ']' in output:
                 json_start = output.index('[')
