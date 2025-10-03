@@ -1,0 +1,142 @@
+name: Compliance Security Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * *'  # Daily scans at midnight
+  workflow_dispatch:
+    inputs:
+      auto_fix:
+        description: 'Enable auto-fix for security issues'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  compliance-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: pip install boto3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Set scan parameters
+      id: params
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          AUTO_FIX="${{ github.event.inputs.auto_fix }}"
+        elif [ "${{ github.event_name }}" = "schedule" ]; then
+          AUTO_FIX="true"   # Enable auto-fix for scheduled scans
+        else
+          AUTO_FIX="false"  # No auto-fix for PR/push events
+        fi
+        echo "auto_fix=$AUTO_FIX" >> $GITHUB_OUTPUT
+        echo "Auto-fix enabled: $AUTO_FIX"
+    
+    - name: Run Compliance Security Scan
+      run: |
+        SCAN_ARGS=""
+        if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
+          SCAN_ARGS="--fix --no-push"
+        fi
+        echo "Running: python src/compliance_scanner.py $SCAN_ARGS"
+        python src/compliance_scanner.py $SCAN_ARGS
+    
+    - name: Generate PR Comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let comment = `## 🔒 Compliance Security Scan Results\n\n`;
+          comment += `**Auto-fix:** ${{ steps.params.outputs.auto_fix }}\n`;
+          comment += `**Model:** Claude 3 Haiku (Cost Optimized)\n\n`;
+          
+          if (fs.existsSync('compliance_report.json')) {
+            const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));
+            
+            comment += `### 📊 Summary\n`;
+            comment += `- Files scanned: ${report.files_scanned}\n`;
+            comment += `- Issues found: ${report.total_issues}\n`;
+            comment += `- AI calls: ${report.ai_calls}\n`;
+            comment += `- Cost: $${report.cost.toFixed(4)}\n`;
+            
+            if (report.fixed > 0) {
+              comment += `- **Auto-fixed:** ${report.fixed} files ✅\n`;
+            }
+            
+            comment += `\n### 🎯 By Severity\n`;
+            for (const [severity, count] of Object.entries(report.by_severity)) {
+              if (count > 0) {
+                const emoji = severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'medium' ? '🟡' : '🟢';
+                comment += `- ${emoji} **${severity.toUpperCase()}**: ${count}\n`;
+              }
+            }
+            
+            if (Object.keys(report.compliance_summary || {}).length > 0) {
+              comment += `\n### 📋 Compliance Violations\n`;
+              for (const [standard, data] of Object.entries(report.compliance_summary)) {
+                comment += `- **${standard}**: ${data.issues} issues (${data.critical} critical, ${data.high} high)\n`;
+              }
+            }
+            
+            if (report.by_severity.critical > 0) {
+              comment += `\n### ❌ Critical Issues Found\n`;
+              comment += `**${report.by_severity.critical} critical** security issues must be fixed before merging.\n`;
+            }
+          } else {
+            comment += `Scan completed but no detailed report available.\n`;
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+    
+    - name: Block on Critical Issues
+      run: |
+        if [ -f "compliance_report.json" ]; then
+          CRITICAL=$(jq -r '.by_severity.critical // 0' compliance_report.json)
+          if [ "$CRITICAL" -gt 0 ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "❌ $CRITICAL critical security issues found. Blocking PR merge."
+            exit 1
+          fi
+        fi
+    
+    - name: Upload Artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-reports
+        path: |
+          compliance_report.json
+          error_log.txt

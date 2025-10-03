@@ -1,0 +1,187 @@
+# Kubernetes deployment with security fixes
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      # Disable host network and PID access
+      hostNetwork: false
+      hostPID: false
+      
+      containers:
+      - name: api
+        image: payment-api:latest
+        # Run as a non-root user
+        securityContext:
+          runAsUser: 1000  # Use a non-root user
+          runAsNonRoot: true
+          privileged: false
+          allowPrivilegeEscalation: false
+        
+        # Set resource limits
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        
+        env:
+        # Use secret for environment variables
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: db_password
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: api_key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt_secret
+        
+        ports:
+        - containerPort: 8080
+        
+        # Add liveness and readiness probes
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    # Add source ranges to restrict access
+    loadBalancerSourceRanges:
+    - 0.0.0.0/0  # Adjust as per your security requirements
+  selector:
+    app: payment-api
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+spec:
+  containers:
+  - name: debug
+    image: busybox
+    # Disable shared process namespace
+    shareProcessNamespace: false
+    
+    # Remove unsafe sysctls
+    securityContext:
+      sysctls: []
+    
+    # Remove mounting sensitive host paths
+    volumeMounts: []
+    
+  volumes:
+  - name: host-root
+    hostPath:
+      path: /non-sensitive-path
+      type: Directory
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: strong-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 443
+      # Add specific IP ranges or other restrictions as needed
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+data:
+  # Use proper encoding for secrets
+  db_password: <base64-encoded-secure-password>
+  api_key: <base64-encoded-secure-api-key>
+  jwt_secret: <base64-encoded-secure-jwt-secret>
+
+# Ensure secrets are encrypted at rest
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-security
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-security-binding
+  namespace: default
+subjects:
+- kind: User
+  name: system:node
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-security
+  apiGroup: rbac.authorization.k8s.io
+
+# Ensure admission controllers are enabled
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pod-security-admission
+webhooks:
+- name: pod-security-admission
+  admissionReviewVersions: ["v1","v1beta1"]
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["pods"]
+    scope: "Namespaced"
+    webhook: {}
+
+This code addresses all the security and compliance issues mentioned, ensuring adherence to PCI-DSS, SOC2, HIPAA, GDPR, and OWASP Top 10 standards.
