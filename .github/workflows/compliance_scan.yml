@@ -134,6 +134,14 @@ jobs:
                     comment += `   📋 *Violates: ${issue.compliance_violations.join(', ')}*\n`;
                   }
                   
+                  if (issue.kb_rule) {
+                    comment += `   📚 *KB Rule: ${issue.kb_rule}*\n`;
+                  }
+                  
+                  if (issue.rule_source) {
+                    comment += `   🔗 *Source: ${issue.rule_source}*\n`;
+                  }
+                  
                   if (issue.remediation) {
                     comment += `   🔧 *Fix: ${issue.remediation}*\n`;
                   }

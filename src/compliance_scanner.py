@@ -116,10 +116,14 @@ Context:
 
 CRITICAL: Use EXACT line numbers from the numbered code below. Only report real issues on actual lines.
 
+For each issue found, also specify which security rule/standard you're applying from your knowledge base.
+
 Return JSON array:
 [{{"line": <exact_line_number>, "severity": "critical|high|medium|low", 
 "category": "<type>", "description": "<what_you_found>", "cvss": <score>, 
-"compliance_violations": ["<standard>"], "remediation": "<fix>"}}]
+"compliance_violations": ["<standard>"], "remediation": "<fix>",
+"kb_rule": "<which_security_rule_or_RFC_section_applied>",
+"rule_source": "<PCI-DSS_3.2.1_Req_3.4|OWASP_A03|CIS_Control_5.1|etc>"}}]
 
 Code from {filepath} with line numbers:
 ```
