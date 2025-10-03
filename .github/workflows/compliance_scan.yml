@@ -126,7 +126,7 @@ jobs:
                 const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
                 issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
                 
-                for (const issue of issues.slice(0, 10)) { // Limit to 10 issues per file
+                for (const issue of issues) { // Show ALL issues, no limit
                   const emoji = issue.severity === 'critical' ? '🔴' : issue.severity === 'high' ? '🟠' : issue.severity === 'medium' ? '🟡' : '🟢';
                   comment += `${emoji} **Line ${issue.line}** (${issue.severity.toUpperCase()}): ${issue.description}\n`;
                   
@@ -139,10 +139,7 @@ jobs:
                   }
                   comment += `\n`;
                 }
-                
-                if (issues.length > 10) {
-                  comment += `   *... and ${issues.length - 10} more issues*\n\n`;
-                }
+                comment += `\n`;
               }
             }
             
