@@ -45,7 +45,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+        aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
     
     - name: Set scan parameters
       id: params
@@ -61,12 +61,19 @@ jobs:
         echo "Auto-fix enabled: $AUTO_FIX"
     
     - name: Run Compliance Security Scan
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+        BEDROCK_KB_ID: ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}
+        BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
           SCAN_ARGS="--fix --no-push"
         fi
         echo "Running: python src/compliance_scanner.py $SCAN_ARGS"
+        echo "Using AWS Region: $AWS_REGION"
+        echo "Using KB ID: $BEDROCK_KB_ID"
+        echo "Using Model: $BEDROCK_MODEL_ID"
         python src/compliance_scanner.py $SCAN_ARGS
     
     - name: Generate PR Comment
@@ -77,7 +84,9 @@ jobs:
           const fs = require('fs');
           let comment = `## 🔒 Compliance Security Scan Results\n\n`;
           comment += `**Auto-fix:** ${{ steps.params.outputs.auto_fix }}\n`;
-          comment += `**Model:** Claude 3 Haiku (Cost Optimized)\n\n`;
+          comment += `**Model:** ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}\n`;
+          comment += `**Knowledge Base:** ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}\n`;
+          comment += `**Region:** ${{ vars.AWS_REGION || 'us-east-1' }}\n\n`;
           
           if (fs.existsSync('compliance_report.json')) {
             const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));

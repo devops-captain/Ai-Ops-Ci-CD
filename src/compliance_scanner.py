@@ -9,9 +9,10 @@ class ComplianceScanner:
     def __init__(self, profile_name=None):
         # Use AWS profile for local development, OIDC for GitHub Actions
         session = boto3.Session(profile_name=profile_name)
-        self.bedrock = session.client('bedrock-runtime', region_name='us-east-1')
-        self.kb_id = '6OFPQYR1JK'  # Your Knowledge Base ID
-        self.model_id = 'anthropic.claude-3-haiku-20240307-v1:0'  # 14% cheaper, good detection
+        self.region = os.getenv('AWS_REGION', 'us-east-1')
+        self.bedrock = session.client('bedrock-runtime', region_name=self.region)
+        self.kb_id = os.getenv('BEDROCK_KB_ID', '6OFPQYR1JK')
+        self.model_id = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
         self.ai_calls = 0
         self.total_cost = 0
         
@@ -106,7 +107,7 @@ Context:
     def query_kb_for_rules(self, code_snippet, language):
         """Query your KB to get specific RFC rules for the code"""
         try:
-            bedrock_agent = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
+            bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=self.region)
             
             query = f"What security rules apply to this {language} code? {code_snippet[:500]}"
             
@@ -116,7 +117,7 @@ Context:
                     'type': 'KNOWLEDGE_BASE',
                     'knowledgeBaseConfiguration': {
                         'knowledgeBaseId': self.kb_id,
-                        'modelArn': f'arn:aws:bedrock:us-east-1::foundation-model/{self.model_id}'
+                        'modelArn': f'arn:aws:bedrock:{self.region}::foundation-model/{self.model_id}'
                     }
                 }
             )
@@ -133,14 +134,20 @@ Context:
                     if s3_location.get('uri'):
                         rfc_sources.append(s3_location['uri'])
             
+            print(f"   📚 KB Query successful - {len(rfc_sources)} sources found")
             return {
                 'kb_guidance': kb_response,
                 'rfc_sources': rfc_sources
             }
             
         except Exception as e:
+            print(f"   ⚠️ KB Query failed: {str(e)[:100]}...")
             self.log_error(f"KB query failed: {e}")
-            return {'kb_guidance': None, 'rfc_sources': []}
+            # Return empty sources when KB query fails
+            return {
+                'kb_guidance': f"Security analysis for {language} code using standard compliance rules",
+                'rfc_sources': []
+            }
     
     def compliance_detect(self, code, language, framework, filepath):
         """Compliance-focused detection using AI with KB integration"""
