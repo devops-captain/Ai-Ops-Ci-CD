@@ -103,27 +103,75 @@ Context:
         
         return language, framework
     
+    def query_kb_for_rules(self, code_snippet, language):
+        """Query your KB to get specific RFC rules for the code"""
+        try:
+            bedrock_agent = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
+            
+            query = f"What security rules apply to this {language} code? {code_snippet[:500]}"
+            
+            response = bedrock_agent.retrieve_and_generate(
+                input={'text': query},
+                retrieveAndGenerateConfiguration={
+                    'type': 'KNOWLEDGE_BASE',
+                    'knowledgeBaseConfiguration': {
+                        'knowledgeBaseId': self.kb_id,
+                        'modelArn': f'arn:aws:bedrock:us-east-1::foundation-model/{self.model_id}'
+                    }
+                }
+            )
+            
+            kb_response = response['output']['text']
+            citations = response.get('citations', [])
+            
+            # Extract RFC references from citations
+            rfc_sources = []
+            for citation in citations:
+                for reference in citation.get('retrievedReferences', []):
+                    location = reference.get('location', {})
+                    s3_location = location.get('s3Location', {})
+                    if s3_location.get('uri'):
+                        rfc_sources.append(s3_location['uri'])
+            
+            return {
+                'kb_guidance': kb_response,
+                'rfc_sources': rfc_sources
+            }
+            
+        except Exception as e:
+            self.log_error(f"KB query failed: {e}")
+            return {'kb_guidance': None, 'rfc_sources': []}
+    
     def compliance_detect(self, code, language, framework, filepath):
-        """Compliance-focused detection using AI with accurate line numbers"""
+        """Compliance-focused detection using AI with KB integration"""
         framework_text = f"/{framework}" if framework else ""
         
         # Add line numbers to code for accuracy
         lines = code.split('\n')
         numbered_code = '\n'.join([f"{i+1:3d}: {line}" for i, line in enumerate(lines)])
         
-        # Pure AI prompt - no hardcoded patterns
-        prompt = f"""You are a security expert. Analyze this {language}{framework_text} code for compliance violations.
+        # Query your KB for relevant RFC rules
+        kb_info = self.query_kb_for_rules(code, language)
+        kb_context = ""
+        if kb_info['kb_guidance']:
+            kb_context = f"\nKnowledge Base Guidance:\n{kb_info['kb_guidance']}\n"
+        
+        # Enhanced AI prompt with KB context
+        prompt = f"""You are a security expert with access to RFC documents and compliance standards.
 
-CRITICAL: Use EXACT line numbers from the numbered code below. Only report real issues on actual lines.
+{kb_context}
 
-For each issue found, also specify which security rule/standard you're applying from your knowledge base.
+Analyze this {language}{framework_text} code for compliance violations using the KB guidance above.
+
+CRITICAL: Use EXACT line numbers from the numbered code below. Reference specific RFC documents when applicable.
 
 Return JSON array:
 [{{"line": <exact_line_number>, "severity": "critical|high|medium|low", 
 "category": "<type>", "description": "<what_you_found>", "cvss": <score>, 
 "compliance_violations": ["<standard>"], "remediation": "<fix>",
-"kb_rule": "<which_security_rule_or_RFC_section_applied>",
-"rule_source": "<PCI-DSS_3.2.1_Req_3.4|OWASP_A03|CIS_Control_5.1|etc>"}}]
+"kb_rule": "<specific_RFC_rule_from_KB>",
+"rfc_document": "<RFC_document_name_from_S3>",
+"rule_source": "<RFC_section_or_standard>"}}]
 
 Code from {filepath} with line numbers:
 ```

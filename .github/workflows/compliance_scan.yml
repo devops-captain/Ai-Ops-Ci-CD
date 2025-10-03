@@ -134,6 +134,10 @@ jobs:
                     comment += `   📋 *Violates: ${issue.compliance_violations.join(', ')}*\n`;
                   }
                   
+                  if (issue.rfc_document) {
+                    comment += `   📄 *RFC Document: ${issue.rfc_document}*\n`;
+                  }
+                  
                   if (issue.kb_rule) {
                     comment += `   📚 *KB Rule: ${issue.kb_rule}*\n`;
                   }
