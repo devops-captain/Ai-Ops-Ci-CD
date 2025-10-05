@@ -85,20 +85,21 @@ class ComplianceScanner:
 - **GitHub Advisories**: {vuln_summary.get('github_advisories', 0)}
 - **Files Scanned**: {report.get('files_scanned', 0)}
 
-### 🚨 Critical Vulnerabilities
+### 🚨 Vulnerabilities Found
 """
         
-        # Add vulnerability details
-        critical_found = False
+        # Add vulnerability details (all severities)
+        vulnerabilities_found = False
         for result in report.get('results', []):
             for issue in result.get('issues', []):
-                if issue.get('type') == 'vulnerability' and issue.get('severity') == 'CRITICAL':
-                    critical_found = True
-                    comment += f"- **{issue.get('vulnerability_id')}** in `{result.get('filepath')}` (Package: {issue.get('package')})\n"
-                    comment += f"  - {issue.get('description', 'No description')[:100]}...\n"
+                if issue.get('type') == 'vulnerability':
+                    vulnerabilities_found = True
+                    severity_emoji = {'CRITICAL': '🔴', 'HIGH': '🟠', 'MEDIUM': '🟡', 'LOW': '🟢'}.get(issue.get('severity'), '⚪')
+                    comment += f"- {severity_emoji} **{issue.get('vulnerability_id')}** in `{result.get('filepath')}` (Package: {issue.get('package')})\n"
+                    comment += f"  - Severity: {issue.get('severity')} | Source: {issue.get('source')}\n"
         
-        if not critical_found:
-            comment += "✅ No critical vulnerabilities found\n"
+        if not vulnerabilities_found:
+            comment += "✅ No vulnerabilities found\n"
         
         comment += f"""
 ### 📋 Compliance Violations
