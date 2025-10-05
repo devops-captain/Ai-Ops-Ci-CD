@@ -619,33 +619,50 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         return fixed.strip()
     
     def extract_dependencies(self, code, filepath):
-        """Extract dependencies from code"""
+        """Extract dependencies from code with line numbers"""
         dependencies = []
         
         if filepath.endswith('.tf'):
             # Terraform modules and providers
-            module_matches = re.findall(r'source\s*=\s*["\']([^"\']+)["\']', code)
-            dependencies.extend([m.split('/')[-1] for m in module_matches])
-            
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                if 'source' in line and '=' in line:
+                    match = re.search(r'source\s*=\s*["\']([^"\']+)["\']', line)
+                    if match:
+                        dep_name = match.group(1).split('/')[-1]
+                        dependencies.append({'name': dep_name, 'line': i})
+                        
         elif filepath.endswith(('.yaml', '.yml')):
             # Docker images, Helm charts
-            image_matches = re.findall(r'image:\s*["\']?([^"\'\s]+)["\']?', code)
-            dependencies.extend([img.split(':')[0].split('/')[-1] for img in image_matches])
-            
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                if 'image:' in line:
+                    match = re.search(r'image:\s*["\']?([^"\'\s]+)["\']?', line)
+                    if match:
+                        img_name = match.group(1).split(':')[0].split('/')[-1]
+                        dependencies.append({'name': img_name, 'line': i})
+                        
         elif filepath.endswith('.js'):
             # NPM packages from require/import
-            npm_matches = re.findall(r'(?:require|import).*?["\']([^"\']+)["\']', code)
-            dependencies.extend([pkg for pkg in npm_matches if not pkg.startswith('./')])
-            
-        return list(set(dependencies))
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                matches = re.findall(r'(?:require|import).*?["\']([^"\']+)["\']', line)
+                for match in matches:
+                    if not match.startswith('./'):
+                        dependencies.append({'name': match, 'line': i})
+        
+        return dependencies
     
     def check_cve_vulnerabilities(self, dependencies):
         """Check dependencies against NIST CVE database"""
         vulnerabilities = []
         
-        for dep in dependencies[:2]:  # Limit to 2 for CI/CD performance
+        for dep_info in dependencies[:2]:  # Limit to 2 for performance
+            dep = dep_info['name'] if isinstance(dep_info, dict) else dep_info
+            line_num = dep_info.get('line', 1) if isinstance(dep_info, dict) else 1
+            
             try:
-                print(f"     🔍 Checking CVE for: {dep}")
+                print(f"     🔍 Checking CVE for: {dep} (line {line_num})")
                 url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
                 params = {'keywordSearch': dep, 'resultsPerPage': 2}
                 
@@ -670,17 +687,22 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                         
                         description = cve_data.get('descriptions', [{}])[0].get('value', 'No description')
                         
+                        # Generate fix suggestion
+                        fix_suggestion = f"Update {dep} to latest version or apply security patch for {vuln_id}"
+                        
                         vulnerabilities.append({
                             'type': 'CVE',
                             'id': vuln_id,
                             'package': dep,
+                            'line': line_num,
                             'severity': self._get_severity_from_cvss(cvss_score),
-                            'description': description[:150] + '...' if len(description) > 150 else description
+                            'description': description[:150] + '...' if len(description) > 150 else description,
+                            'fix': fix_suggestion
                         })
                 else:
                     print(f"     ❌ CVE API error {response.status_code} for {dep}")
                 
-                time.sleep(0.5)  # Longer delay for CI/CD
+                time.sleep(0.5)  # Rate limiting
                 
             except Exception as e:
                 print(f"     ❌ CVE check failed for {dep}: {e}")
@@ -811,7 +833,8 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 'package': vuln['package'],
                 'vulnerability_id': vuln['id'],
                 'source': vuln['type'],
-                'line': 1,  # Add required line field
+                'line': vuln.get('line', 1),
+                'fix': vuln.get('fix', f"Update {vuln['package']} to resolve {vuln['id']}"),
                 'compliance_violations': ['Security']
             })
         

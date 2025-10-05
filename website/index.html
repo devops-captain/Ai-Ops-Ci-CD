@@ -614,6 +614,13 @@
         <div id="vulnerabilities" class="tab-content">
             <div class="table-container">
                 <h2>🔍 Vulnerability Analysis</h2>
+                
+                <!-- Leadership Vulnerability Chart -->
+                <div style="margin-bottom: 30px; background: rgba(30, 30, 30, 0.95); padding: 20px; border-radius: 10px; border: 1px solid #333;">
+                    <h3 style="color: #00ff41; margin-bottom: 15px;">📊 Executive Vulnerability Overview</h3>
+                    <canvas id="vulnerabilityChart" width="800" height="300" style="max-width: 100%; background: rgba(10, 10, 10, 0.8); border-radius: 5px;"></canvas>
+                </div>
+                
                 <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
                     <div class="stat-card critical" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnCriticalCount">0</h3>
@@ -636,11 +643,12 @@
                     <thead>
                         <tr>
                             <th>File</th>
+                            <th>Line</th>
                             <th>Package</th>
                             <th>Vulnerability ID</th>
                             <th>Source</th>
                             <th>Severity</th>
-                            <th>Description</th>
+                            <th>Fix</th>
                             <th>Scan Context</th>
                         </tr>
                     </thead>
@@ -1125,6 +1133,7 @@
             tbody.innerHTML = '';
             
             let vulnStats = { critical: 0, high: 0, cve: 0, github: 0 };
+            let vulnData = [];
             
             filteredReports.forEach(report => {
                 const scanContext = report.scan_context || {};
@@ -1143,14 +1152,20 @@
                                     if (issue.source === 'CVE') vulnStats.cve++;
                                     if (issue.source === 'GitHub Advisory') vulnStats.github++;
                                     
+                                    vulnData.push({
+                                        severity: issue.severity,
+                                        package: issue.package
+                                    });
+                                    
                                     const row = tbody.insertRow();
                                     row.innerHTML = `
                                         <td><code>${result.filepath}</code></td>
+                                        <td><span class="severity-badge severity-low">${issue.line || 1}</span></td>
                                         <td><strong>${issue.package}</strong></td>
                                         <td><a href="https://nvd.nist.gov/vuln/detail/${issue.vulnerability_id}" target="_blank" style="color: #00ff41;">${issue.vulnerability_id}</a></td>
                                         <td><span class="severity-badge ${issue.source === 'CVE' ? 'severity-high' : 'severity-medium'}">${issue.source}</span></td>
                                         <td><span class="severity-badge severity-${issue.severity.toLowerCase()}">${issue.severity}</span></td>
-                                        <td style="max-width: 300px; word-wrap: break-word;">${issue.description}</td>
+                                        <td style="max-width: 200px; word-wrap: break-word;">${issue.fix || 'Update package'}</td>
                                         <td>${contextDisplay}</td>
                                     `;
                                 }
@@ -1165,6 +1180,74 @@
             document.getElementById('vulnHighCount').textContent = vulnStats.high;
             document.getElementById('vulnCveCount').textContent = vulnStats.cve;
             document.getElementById('vulnGithubCount').textContent = vulnStats.github;
+            
+            // Draw vulnerability chart
+            drawVulnerabilityChart(vulnData);
+        }
+
+        function drawVulnerabilityChart(vulnData) {
+            const canvas = document.getElementById('vulnerabilityChart');
+            const ctx = canvas.getContext('2d');
+            
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const width = rect.width;
+            const height = rect.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Count vulnerabilities by severity
+            const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            vulnData.forEach(vuln => {
+                severityCounts[vuln.severity] = (severityCounts[vuln.severity] || 0) + 1;
+            });
+            
+            const colors = {
+                CRITICAL: '#ff4444',
+                HIGH: '#ff8800', 
+                MEDIUM: '#ffaa00',
+                LOW: '#00ff41'
+            };
+            
+            const maxCount = Math.max(...Object.values(severityCounts), 1);
+            const barWidth = (width - 100) / 4;
+            const barMaxHeight = height - 80;
+            
+            // Draw bars
+            Object.entries(severityCounts).forEach(([severity, count], index) => {
+                const barHeight = (count / maxCount) * barMaxHeight;
+                const x = 50 + index * barWidth;
+                const y = height - 40 - barHeight;
+                
+                // Gradient
+                const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+                gradient.addColorStop(0, colors[severity]);
+                gradient.addColorStop(1, colors[severity] + '80');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth - 20, barHeight);
+                
+                // Border
+                ctx.strokeStyle = colors[severity];
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, barWidth - 20, barHeight);
+                
+                // Labels
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(severity, x + (barWidth - 20) / 2, height - 20);
+                ctx.fillText(count.toString(), x + (barWidth - 20) / 2, y - 10);
+            });
+            
+            // Title
+            ctx.fillStyle = '#00ff41';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Vulnerability Distribution by Severity', width / 2, 25);
         }
 
         function drawTrendChart() {
