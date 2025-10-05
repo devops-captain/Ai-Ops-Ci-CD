@@ -67,6 +67,8 @@ jobs:
         BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
         REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET || 'ai-security-scanner-reports-1759503117' }}
         GITHUB_PR_NUMBER: ${{ github.event.number }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then

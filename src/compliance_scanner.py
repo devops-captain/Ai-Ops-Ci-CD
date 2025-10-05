@@ -4,6 +4,9 @@ import json
 import boto3
 import glob
 import hashlib
+import requests
+import time
+import re
 from datetime import datetime
 
 class ComplianceScanner:
@@ -55,6 +58,96 @@ class ComplianceScanner:
         
         return cache_data
     
+    def post_pr_comment(self, report):
+        """Post comprehensive PR comment with vulnerability and compliance details"""
+        github_token = os.environ.get('GITHUB_TOKEN')
+        repo = os.environ.get('GITHUB_REPOSITORY')  # format: owner/repo
+        pr_number = os.environ.get('GITHUB_PR_NUMBER')
+        
+        if not all([github_token, repo, pr_number]):
+            print("⚠️ Missing GitHub environment variables for PR commenting")
+            return
+        
+        # Generate comment content
+        vuln_summary = report.get('vulnerability_summary', {})
+        total_issues = report.get('total_issues', 0)
+        total_vulns = vuln_summary.get('total_vulnerabilities', 0)
+        critical_vulns = vuln_summary.get('critical_vulns', 0)
+        high_vulns = vuln_summary.get('high_vulns', 0)
+        
+        # Build comment
+        comment = f"""## 🔍 ThreatLens Security Scan Results
+
+### 📊 Summary
+- **Total Issues**: {total_issues}
+- **Vulnerabilities**: {total_vulns} (Critical: {critical_vulns}, High: {high_vulns})
+- **CVE Findings**: {vuln_summary.get('cve_findings', 0)}
+- **GitHub Advisories**: {vuln_summary.get('github_advisories', 0)}
+- **Files Scanned**: {report.get('files_scanned', 0)}
+
+### 🚨 Critical Vulnerabilities
+"""
+        
+        # Add vulnerability details
+        critical_found = False
+        for result in report.get('results', []):
+            for issue in result.get('issues', []):
+                if issue.get('type') == 'vulnerability' and issue.get('severity') == 'CRITICAL':
+                    critical_found = True
+                    comment += f"- **{issue.get('vulnerability_id')}** in `{result.get('filepath')}` (Package: {issue.get('package')})\n"
+                    comment += f"  - {issue.get('description', 'No description')[:100]}...\n"
+        
+        if not critical_found:
+            comment += "✅ No critical vulnerabilities found\n"
+        
+        comment += f"""
+### 📋 Compliance Violations
+"""
+        
+        # Add compliance summary
+        compliance_summary = report.get('compliance_summary', {})
+        if compliance_summary:
+            for standard, data in list(compliance_summary.items())[:5]:  # Top 5
+                comment += f"- **{standard}**: {data.get('issues', 0)} issues"
+                if data.get('critical', 0) > 0:
+                    comment += f" (⚠️ {data.get('critical', 0)} critical)"
+                comment += "\n"
+        
+        comment += f"""
+### 🔗 Dashboard
+📊 [View Full ThreatLens Dashboard](https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/dashboard.html?v={int(time.time())})
+
+### 🛠️ Next Steps
+"""
+        
+        if critical_vulns > 0 or report.get('by_severity', {}).get('critical', 0) > 0:
+            comment += "❌ **PR BLOCKED** - Critical issues must be resolved before merging\n"
+            comment += "1. Review critical vulnerabilities above\n"
+            comment += "2. Update dependencies or apply patches\n"
+            comment += "3. Re-run scan after fixes\n"
+        else:
+            comment += "✅ No critical issues blocking merge\n"
+            comment += "1. Review high/medium severity findings\n"
+            comment += "2. Consider addressing before production deployment\n"
+        
+        # Post comment
+        try:
+            url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
+            headers = {
+                'Authorization': f'Bearer {github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            payload = {'body': comment}
+            
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code == 201:
+                print(f"✅ Posted PR comment to #{pr_number}")
+            else:
+                print(f"⚠️ Failed to post PR comment: {response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ PR comment error: {e}")
+
     def save_cache(self):
         """Save file hash cache to both S3 and local"""
         # Save locally
@@ -527,6 +620,142 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         return fixed.strip()
     
+    def extract_dependencies(self, code, filepath):
+        """Extract dependencies from code"""
+        dependencies = []
+        
+        if filepath.endswith('.tf'):
+            # Terraform modules and providers
+            module_matches = re.findall(r'source\s*=\s*["\']([^"\']+)["\']', code)
+            dependencies.extend([m.split('/')[-1] for m in module_matches])
+            
+        elif filepath.endswith(('.yaml', '.yml')):
+            # Docker images, Helm charts
+            image_matches = re.findall(r'image:\s*["\']?([^"\'\s]+)["\']?', code)
+            dependencies.extend([img.split(':')[0].split('/')[-1] for img in image_matches])
+            
+        elif filepath.endswith('.js'):
+            # NPM packages from require/import
+            npm_matches = re.findall(r'(?:require|import).*?["\']([^"\']+)["\']', code)
+            dependencies.extend([pkg for pkg in npm_matches if not pkg.startswith('./')])
+            
+        return list(set(dependencies))
+    
+    def check_cve_vulnerabilities(self, dependencies):
+        """Check dependencies against NIST CVE database"""
+        vulnerabilities = []
+        
+        for dep in dependencies[:3]:  # Limit to avoid rate limits
+            try:
+                url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+                params = {'keywordSearch': dep, 'resultsPerPage': 3}
+                
+                response = requests.get(url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    for cve in data.get('vulnerabilities', []):
+                        cve_data = cve.get('cve', {})
+                        vuln_id = cve_data.get('id', 'Unknown')
+                        
+                        metrics = cve_data.get('metrics', {})
+                        cvss_score = 'Unknown'
+                        if 'cvssMetricV31' in metrics:
+                            cvss_score = metrics['cvssMetricV31'][0]['cvssData']['baseScore']
+                        elif 'cvssMetricV2' in metrics:
+                            cvss_score = metrics['cvssMetricV2'][0]['cvssData']['baseScore']
+                        
+                        description = cve_data.get('descriptions', [{}])[0].get('value', 'No description')
+                        
+                        vulnerabilities.append({
+                            'type': 'CVE',
+                            'id': vuln_id,
+                            'package': dep,
+                            'severity': self._get_severity_from_cvss(cvss_score),
+                            'description': description[:150] + '...' if len(description) > 150 else description
+                        })
+                
+                time.sleep(0.2)  # Rate limiting
+                
+            except Exception as e:
+                print(f"CVE check failed for {dep}: {e}")
+        
+        return vulnerabilities
+    
+    def check_github_advisories(self, dependencies):
+        """Check dependencies against GitHub Advisory Database"""
+        advisories = []
+        github_token = os.environ.get("GITHUB_TOKEN")
+        
+        if not github_token:
+            return advisories
+        
+        for dep in dependencies[:3]:  # Limit to avoid rate limits
+            try:
+                url = "https://api.github.com/graphql"
+                query = """
+                query($query: String!) {
+                  search(query: $query, type: REPOSITORY, first: 3) {
+                    nodes {
+                      ... on Repository {
+                        vulnerabilityAlerts(first: 3) {
+                          nodes {
+                            securityAdvisory {
+                              ghsaId
+                              summary
+                              severity
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """
+                
+                headers = {'Authorization': f'Bearer {github_token}'}
+                payload = {'query': query, 'variables': {'query': dep}}
+                
+                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    for repo in data.get('data', {}).get('search', {}).get('nodes', []):
+                        for alert in repo.get('vulnerabilityAlerts', {}).get('nodes', []):
+                            advisory = alert.get('securityAdvisory', {})
+                            
+                            advisories.append({
+                                'type': 'GitHub Advisory',
+                                'id': advisory.get('ghsaId', 'Unknown'),
+                                'package': dep,
+                                'severity': advisory.get('severity', 'Unknown').upper(),
+                                'description': advisory.get('summary', 'No summary')[:150] + '...'
+                            })
+                
+                time.sleep(0.2)  # Rate limiting
+                
+            except Exception as e:
+                print(f"GitHub Advisory check failed for {dep}: {e}")
+        
+        return advisories
+    
+    def _get_severity_from_cvss(self, score):
+        """Convert CVSS score to severity level"""
+        if score == 'Unknown':
+            return 'UNKNOWN'
+        try:
+            score = float(score)
+            if score >= 9.0:
+                return 'CRITICAL'
+            elif score >= 7.0:
+                return 'HIGH'
+            elif score >= 4.0:
+                return 'MEDIUM'
+            else:
+                return 'LOW'
+        except:
+            return 'UNKNOWN'
+    
     def scan_file(self, filepath, auto_fix=False):
         """Scan file with compliance focus and caching"""
         try:
@@ -547,8 +776,32 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         print(f"🔍 Compliance scanning {filepath} ({language}{f'/{framework}' if framework else ''})...")
         
+        # Extract and check dependencies for vulnerabilities
+        dependencies = self.extract_dependencies(code, filepath)
+        vulnerabilities = []
+        
+        if dependencies:
+            print(f"   🔍 Checking {len(dependencies)} dependencies for vulnerabilities...")
+            vulnerabilities.extend(self.check_cve_vulnerabilities(dependencies))
+            vulnerabilities.extend(self.check_github_advisories(dependencies))
+            
+            if vulnerabilities:
+                print(f"   ⚠️ Found {len(vulnerabilities)} vulnerabilities")
+        
         # Compliance-focused detection
         issues = self.compliance_detect(code, language, framework, filepath)
+        
+        # Add vulnerability issues to compliance issues
+        for vuln in vulnerabilities:
+            issues.append({
+                'type': 'vulnerability',
+                'severity': vuln['severity'],
+                'description': f"{vuln['type']} {vuln['id']}: {vuln['description']}",
+                'package': vuln['package'],
+                'vulnerability_id': vuln['id'],
+                'source': vuln['type'],
+                'compliance_violations': ['Security']  # Add to compliance tracking
+            })
         
         if not issues:
             print(f"   ✅ No compliance issues found")
@@ -667,19 +920,30 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         total_issues = sum(len(r['issues']) for r in results)
         fixed_count = sum(1 for r in results if r['fixed'])
         
+        # Count vulnerabilities
+        vulnerability_issues = []
+        for r in results:
+            vulnerability_issues.extend([i for i in r['issues'] if i.get('type') == 'vulnerability'])
+        
+        vuln_count = len(vulnerability_issues)
+        cve_count = len([v for v in vulnerability_issues if v.get('source') == 'CVE'])
+        github_count = len([v for v in vulnerability_issues if v.get('source') == 'GitHub Advisory'])
+        
         by_severity = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         for r in results:
             for i in r['issues']:
                 by_severity[i['severity']] = by_severity.get(i['severity'], 0) + 1
         
         print(f"\n{'='*60}")
-        print(f"📊 Compliance Scan Results")
+        print(f"📊 Compliance Scan Results + Vulnerability Check")
         print(f"{'='*60}")
         print(f"Files scanned: {len(files)}")
         print(f"Issues found: {total_issues}")
+        print(f"Vulnerabilities: {vuln_count} (CVE: {cve_count}, GitHub: {github_count})")
         print(f"AI calls: {self.ai_calls}")
         print(f"Cost: ${self.total_cost:.4f}")
-        if auto_fix:            print(f"Fixed: {fixed_count} files")
+        if auto_fix:
+            print(f"Fixed: {fixed_count} files")
         
         print(f"\n🎯 Severity:")
         for s in ['critical', 'high', 'medium', 'low']:
@@ -710,6 +974,13 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
             'knowledge_base_id': self.kb_id,
             'files_scanned': len(files),
             'total_issues': total_issues,
+            'vulnerability_summary': {
+                'total_vulnerabilities': vuln_count,
+                'cve_findings': cve_count,
+                'github_advisories': github_count,
+                'critical_vulns': len([v for v in vulnerability_issues if v.get('severity') == 'CRITICAL']),
+                'high_vulns': len([v for v in vulnerability_issues if v.get('severity') == 'HIGH'])
+            },
             'ai_calls': self.ai_calls,
             'cost': self.total_cost,
             'fixed': fixed_count if auto_fix else 0,
@@ -723,6 +994,10 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Upload to S3 if configured
         self.upload_to_s3(report)
+        
+        # Post PR comment if in CI/CD
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            self.post_pr_comment(report)
         
         # Save cache after scan
         self.save_cache()

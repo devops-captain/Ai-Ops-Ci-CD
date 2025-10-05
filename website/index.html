@@ -526,6 +526,7 @@
             <button class="tab" onclick="showTab('issues')">All Issues</button>
             <button class="tab" onclick="showTab('files')">Files Detail</button>
             <button class="tab" onclick="showTab('compliance')">Compliance</button>
+            <button class="tab" onclick="showTab('vulnerabilities')">🔍 Vulnerabilities</button>
         </div>
 
         <div id="recent" class="tab-content active">
@@ -605,6 +606,45 @@
                         </tr>
                     </thead>
                     <tbody id="complianceTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="vulnerabilities" class="tab-content">
+            <div class="table-container">
+                <h2>🔍 Vulnerability Analysis</h2>
+                <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div class="stat-card critical" style="flex: 1; min-width: 200px;">
+                        <h3 id="vulnCriticalCount">0</h3>
+                        <p>Critical CVEs</p>
+                    </div>
+                    <div class="stat-card high" style="flex: 1; min-width: 200px;">
+                        <h3 id="vulnHighCount">0</h3>
+                        <p>High Severity</p>
+                    </div>
+                    <div class="stat-card medium" style="flex: 1; min-width: 200px;">
+                        <h3 id="vulnCveCount">0</h3>
+                        <p>CVE Database</p>
+                    </div>
+                    <div class="stat-card low" style="flex: 1; min-width: 200px;">
+                        <h3 id="vulnGithubCount">0</h3>
+                        <p>GitHub Advisories</p>
+                    </div>
+                </div>
+                <table id="vulnerabilitiesTable">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Package</th>
+                            <th>Vulnerability ID</th>
+                            <th>Source</th>
+                            <th>Severity</th>
+                            <th>Description</th>
+                            <th>Scan Context</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vulnerabilitiesTableBody">
                     </tbody>
                 </table>
             </div>
@@ -876,6 +916,7 @@
             updateIssuesTable();
             updateFilesTable();
             updateComplianceTable();
+            updateVulnerabilitiesTable();
         }
 
         function updateScansTable() {
@@ -1076,6 +1117,53 @@
                     <td>${score > 80 ? '📈 Improving' : '📉 Needs Attention'}</td>
                 `;
             });
+        }
+
+        function updateVulnerabilitiesTable() {
+            const tbody = document.getElementById('vulnerabilitiesTableBody');
+            tbody.innerHTML = '';
+            
+            let vulnStats = { critical: 0, high: 0, cve: 0, github: 0 };
+            
+            filteredReports.forEach(report => {
+                const scanContext = report.scan_context || {};
+                const contextDisplay = scanContext.is_cicd ? 
+                    `🔄 ${scanContext.runner || 'CI/CD'} - ${scanContext.scan_name || 'Unknown'}` : 
+                    `💻 Local - ${scanContext.scan_name || 'Unknown'}`;
+                
+                if (report.results) {
+                    report.results.forEach(result => {
+                        if (result.issues) {
+                            result.issues.forEach(issue => {
+                                if (issue.type === 'vulnerability') {
+                                    // Update stats
+                                    if (issue.severity === 'CRITICAL') vulnStats.critical++;
+                                    if (issue.severity === 'HIGH') vulnStats.high++;
+                                    if (issue.source === 'CVE') vulnStats.cve++;
+                                    if (issue.source === 'GitHub Advisory') vulnStats.github++;
+                                    
+                                    const row = tbody.insertRow();
+                                    row.innerHTML = `
+                                        <td><code>${result.filepath}</code></td>
+                                        <td><strong>${issue.package}</strong></td>
+                                        <td><a href="https://nvd.nist.gov/vuln/detail/${issue.vulnerability_id}" target="_blank" style="color: #00ff41;">${issue.vulnerability_id}</a></td>
+                                        <td><span class="severity-badge ${issue.source === 'CVE' ? 'severity-high' : 'severity-medium'}">${issue.source}</span></td>
+                                        <td><span class="severity-badge severity-${issue.severity.toLowerCase()}">${issue.severity}</span></td>
+                                        <td style="max-width: 300px; word-wrap: break-word;">${issue.description}</td>
+                                        <td>${contextDisplay}</td>
+                                    `;
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Update vulnerability stats
+            document.getElementById('vulnCriticalCount').textContent = vulnStats.critical;
+            document.getElementById('vulnHighCount').textContent = vulnStats.high;
+            document.getElementById('vulnCveCount').textContent = vulnStats.cve;
+            document.getElementById('vulnGithubCount').textContent = vulnStats.github;
         }
 
         function drawTrendChart() {
