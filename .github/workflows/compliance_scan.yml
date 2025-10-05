@@ -65,7 +65,7 @@ jobs:
         AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
         BEDROCK_KB_ID: ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}
         BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
-        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET }}
+        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET || 'scanner-reports-dashboard-675004273779' }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
