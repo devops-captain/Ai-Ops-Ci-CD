@@ -39,3 +39,4 @@ credentials
 # Logs
 *.log
 logs/
+.compliance_cache.json

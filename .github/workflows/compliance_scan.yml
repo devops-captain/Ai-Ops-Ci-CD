@@ -75,8 +75,9 @@ jobs:
         echo "Using AWS Region: $AWS_REGION"
         echo "Using KB ID: $BEDROCK_KB_ID"
         echo "Using Model: $BEDROCK_MODEL_ID"
+        echo "Using S3 Bucket: $REPORTS_S3_BUCKET (includes cache persistence)"
         if [ -n "$REPORTS_S3_BUCKET" ]; then
-          echo "Reports will be uploaded to: s3://$REPORTS_S3_BUCKET"
+          echo "Reports and cache will be stored in: s3://$REPORTS_S3_BUCKET"
         fi
         python src/compliance_scanner.py $SCAN_ARGS
     

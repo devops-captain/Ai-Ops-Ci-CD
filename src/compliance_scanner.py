@@ -3,6 +3,7 @@ import os
 import json
 import boto3
 import glob
+import hashlib
 from datetime import datetime
 
 class ComplianceScanner:
@@ -15,6 +16,8 @@ class ComplianceScanner:
         self.model_id = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
         self.ai_calls = 0
         self.total_cost = 0
+        self.cache_file = '.compliance_cache.json'
+        self.file_cache = self.load_cache()
         
         # Compliance-focused prompts
         self.compliance_context = {
@@ -24,6 +27,93 @@ class ComplianceScanner:
             'GDPR': 'GDPR requires data protection by design, consent management, data minimization, and breach notification.',
             'OWASP': 'OWASP Top 10 covers injection, broken authentication, sensitive data exposure, and security misconfigurations.'
         }
+    
+    def load_cache(self):
+        """Load file hash cache from S3 in CI/CD or local file"""
+        cache_data = {}
+        
+        # Try S3 cache first (for CI/CD)
+        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
+        if s3_bucket:
+            try:
+                s3 = boto3.client('s3', region_name=self.region)
+                response = s3.get_object(Bucket=s3_bucket, Key='cache/compliance_cache.json')
+                cache_data = json.loads(response['Body'].read().decode('utf-8'))
+                print(f"📋 Loaded cache from S3: {len(cache_data)} files")
+                return cache_data
+            except Exception as e:
+                print(f"📋 No S3 cache found, starting fresh")
+        
+        # Fallback to local cache
+        try:
+            if os.path.exists(self.cache_file):
+                with open(self.cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                print(f"📋 Loaded local cache: {len(cache_data)} files")
+        except Exception as e:
+            print(f"⚠️ Cache load error: {e}")
+        
+        return cache_data
+    
+    def save_cache(self):
+        """Save file hash cache to both S3 and local"""
+        # Save locally
+        try:
+            with open(self.cache_file, 'w') as f:
+                json.dump(self.file_cache, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Local cache save error: {e}")
+        
+        # Save to S3 for CI/CD persistence
+        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
+        if s3_bucket:
+            try:
+                s3 = boto3.client('s3', region_name=self.region)
+                s3.put_object(
+                    Bucket=s3_bucket,
+                    Key='cache/compliance_cache.json',
+                    Body=json.dumps(self.file_cache, indent=2),
+                    ContentType='application/json'
+                )
+                print(f"📋 Cache saved to S3: {len(self.file_cache)} files")
+            except Exception as e:
+                print(f"⚠️ S3 cache save error: {e}")
+    
+    def get_file_hash(self, filepath):
+        """Get SHA256 hash of file content"""
+        try:
+            with open(filepath, 'rb') as f:
+                return hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            return None
+    
+    def is_file_changed(self, filepath):
+        """Check if file has changed since last scan"""
+        current_hash = self.get_file_hash(filepath)
+        if not current_hash:
+            return True
+        
+        cached_data = self.file_cache.get(filepath, {})
+        return cached_data.get('hash') != current_hash
+    
+    def update_file_cache(self, filepath, scan_result):
+        """Update cache with new scan result"""
+        file_hash = self.get_file_hash(filepath)
+        if file_hash:
+            self.file_cache[filepath] = {
+                'hash': file_hash,
+                'result': scan_result,
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    def get_cached_result(self, filepath):
+        """Get cached scan result if file unchanged"""
+        if not self.is_file_changed(filepath):
+            cached_data = self.file_cache.get(filepath, {})
+            if 'result' in cached_data:
+                print(f"   📋 Using cached result (file unchanged)")
+                return cached_data['result']
+        return None
     
     def call_ai_with_compliance(self, prompt):
         """AI call with compliance context"""
@@ -387,8 +477,13 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         return fixed.strip()
     
     def scan_file(self, filepath, auto_fix=False):
-        """Scan file with compliance focus"""
+        """Scan file with compliance focus and caching"""
         try:
+            # Check cache first
+            cached_result = self.get_cached_result(filepath)
+            if cached_result:
+                return cached_result
+            
             with open(filepath, 'r') as f:
                 code = f.read()
         except Exception as e:
@@ -406,44 +501,48 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         if not issues:
             print(f"   ✅ No compliance issues found")
-            return None
-        
-        print(f"   Found {len(issues)} issues")
-        
-        # Show compliance violations
-        compliance_violations = set()
-        for issue in issues:
-            compliance_violations.update(issue.get('compliance_violations', []))
-        
-        if compliance_violations:
-            print(f"   📋 Compliance violations: {', '.join(compliance_violations)}")
-        
-        fixed = False
-        if auto_fix:
-            print(f"   🔧 Compliance-focused AI fixing...")
-            fixed_code = self.compliance_fix(code, issues, language, framework)
+            result = None
+        else:
+            print(f"   Found {len(issues)} issues")
             
-            if fixed_code and len(fixed_code) > 50 and fixed_code != code:
-                # Basic validation without external tools
-                print(f"   🔍 Validating fixed code...")
-                is_valid = self.basic_validation(fixed_code, language)
+            # Show compliance violations
+            compliance_violations = set()
+            for issue in issues:
+                compliance_violations.update(issue.get('compliance_violations', []))
+            
+            if compliance_violations:
+                print(f"   📋 Compliance violations: {', '.join(compliance_violations)}")
+            
+            fixed = False
+            if auto_fix:
+                print(f"   🔧 Compliance-focused AI fixing...")
+                fixed_code = self.compliance_fix(code, issues, language, framework)
                 
-                if is_valid and fixed_code != code:
-                    with open(filepath, 'w') as f:
-                        f.write(fixed_code)
-                    fixed = True
-                    print(f"   ✅ Fixed and validated with compliance standards")
-                else:
-                    print(f"   ❌ Fix validation failed - keeping original")
+                if fixed_code and len(fixed_code) > 50 and fixed_code != code:
+                    # Basic validation without external tools
+                    print(f"   🔍 Validating fixed code...")
+                    is_valid = self.basic_validation(fixed_code, language)
+                    
+                    if is_valid and fixed_code != code:
+                        with open(filepath, 'w') as f:
+                            f.write(fixed_code)
+                        fixed = True
+                        print(f"   ✅ Fixed and validated with compliance standards")
+                    else:
+                        print(f"   ❌ Fix validation failed - keeping original")
+            
+            result = {
+                'filepath': filepath,
+                'language': language,
+                'framework': framework,
+                'issues': issues,
+                'fixed': fixed,
+                'compliance_violations': list(compliance_violations)
+            }
         
-        return {
-            'filepath': filepath,
-            'language': language,
-            'framework': framework,
-            'issues': issues,
-            'fixed': fixed,
-            'compliance_violations': list(compliance_violations)
-        }
+        # Cache the result
+        self.update_file_cache(filepath, result)
+        return result
     
     def upload_to_s3(self, report):
         """Upload report to S3 for web dashboard"""
@@ -571,6 +670,9 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Upload to S3 if configured
         self.upload_to_s3(report)
+        
+        # Save cache after scan
+        self.save_cache()
         
         print(f"\n📄 Report: compliance_report.json")
         
