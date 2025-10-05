@@ -696,8 +696,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                             'package': dep,
                             'line': line_num,
                             'severity': self._get_severity_from_cvss(cvss_score),
-                            'description': description[:150] + '...' if len(description) > 150 else description,
-                            'fix': fix_suggestion
+                            'description': description[:150] + '...' if len(description) > 150 else description
                         })
                 else:
                     print(f"     ❌ CVE API error {response.status_code} for {dep}")
@@ -834,7 +833,6 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 'vulnerability_id': vuln['id'],
                 'source': vuln['type'],
                 'line': vuln.get('line', 1),
-                'fix': vuln.get('fix', f"Update {vuln['package']} to resolve {vuln['id']}"),
                 'compliance_violations': ['Security']
             })
         

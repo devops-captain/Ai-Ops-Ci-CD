@@ -648,7 +648,6 @@
                             <th>Vulnerability ID</th>
                             <th>Source</th>
                             <th>Severity</th>
-                            <th>Fix</th>
                             <th>Scan Context</th>
                         </tr>
                     </thead>
@@ -1165,7 +1164,6 @@
                                         <td><a href="https://nvd.nist.gov/vuln/detail/${issue.vulnerability_id}" target="_blank" style="color: #00ff41;">${issue.vulnerability_id}</a></td>
                                         <td><span class="severity-badge ${issue.source === 'CVE' ? 'severity-high' : 'severity-medium'}">${issue.source}</span></td>
                                         <td><span class="severity-badge severity-${issue.severity.toLowerCase()}">${issue.severity}</span></td>
-                                        <td style="max-width: 200px; word-wrap: break-word;">${issue.fix || 'Update package'}</td>
                                         <td>${contextDisplay}</td>
                                     `;
                                 }
