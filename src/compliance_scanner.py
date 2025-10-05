@@ -788,24 +788,11 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         if dependencies:
             print(f"   🔍 Found dependencies: {dependencies}")
-            # Skip API calls in CI/CD for now - just create mock vulnerabilities for testing
-            if os.environ.get('GITHUB_ACTIONS') == 'true':
-                print(f"   ⚠️ CI/CD detected - using mock vulnerability data")
-                for dep in dependencies[:2]:
-                    vulnerabilities.append({
-                        'type': 'CVE',
-                        'id': f'CVE-2024-MOCK-{dep[:4].upper()}',
-                        'package': dep,
-                        'severity': 'MEDIUM',
-                        'description': f'Mock vulnerability for {dep} - API calls disabled in CI/CD'
-                    })
-            else:
-                # Only do real API calls locally
-                try:
-                    vulnerabilities.extend(self.check_cve_vulnerabilities(dependencies))
-                    vulnerabilities.extend(self.check_github_advisories(dependencies))
-                except Exception as e:
-                    print(f"   ❌ Vulnerability check failed: {e}")
+            try:
+                vulnerabilities.extend(self.check_cve_vulnerabilities(dependencies))
+                vulnerabilities.extend(self.check_github_advisories(dependencies))
+            except Exception as e:
+                print(f"   ❌ Vulnerability check failed: {e}")
             
             if vulnerabilities:
                 print(f"   ⚠️ Found {len(vulnerabilities)} vulnerabilities")
