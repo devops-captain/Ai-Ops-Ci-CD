@@ -115,6 +115,57 @@ class ComplianceScanner:
                 return cached_data['result']
         return None
     
+    def get_scan_context(self):
+        """Get scan context - CI/CD info or local timestamp"""
+        # Check if running in GitHub Actions
+        if os.getenv('GITHUB_ACTIONS'):
+            repo_name = os.getenv('GITHUB_REPOSITORY', 'unknown-repo')
+            branch_name = os.getenv('GITHUB_REF_NAME', 'unknown-branch')
+            pr_number = os.getenv('GITHUB_EVENT_NUMBER') or os.getenv('GITHUB_PR_NUMBER')
+            
+            if pr_number:
+                scan_name = f"{repo_name}/PR-{pr_number}"
+                scan_id = f"{repo_name.replace('/', '_')}_PR_{pr_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            else:
+                scan_name = f"{repo_name}/{branch_name}"
+                scan_id = f"{repo_name.replace('/', '_')}_{branch_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            return {
+                'is_cicd': True,
+                'scan_name': scan_name,
+                'scan_id': scan_id,
+                'repo_name': repo_name,
+                'branch_name': branch_name,
+                'pr_number': pr_number,
+                'runner': 'GitHub Actions'
+            }
+        
+        # Check for other CI/CD systems
+        elif os.getenv('CI'):
+            ci_system = 'Unknown CI'
+            if os.getenv('JENKINS_URL'): ci_system = 'Jenkins'
+            elif os.getenv('GITLAB_CI'): ci_system = 'GitLab CI'
+            elif os.getenv('CIRCLECI'): ci_system = 'CircleCI'
+            elif os.getenv('TRAVIS'): ci_system = 'Travis CI'
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return {
+                'is_cicd': True,
+                'scan_name': f"{ci_system}-{timestamp}",
+                'scan_id': f"ci_{timestamp}",
+                'runner': ci_system
+            }
+        
+        # Local development
+        else:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return {
+                'is_cicd': False,
+                'scan_name': f"Local-{timestamp}",
+                'scan_id': timestamp,
+                'runner': 'Local Development'
+            }
+    
     def call_ai_with_compliance(self, prompt):
         """AI call with compliance context"""
         compliance_prompt = f"""
@@ -552,8 +603,8 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         try:
             s3 = boto3.client('s3', region_name=self.region)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            key = f"reports/{timestamp}_compliance_report.json"
+            context = self.get_scan_context()
+            key = f"reports/{context['scan_id']}_compliance_report.json"
             
             s3.put_object(
                 Bucket=s3_bucket,
@@ -562,6 +613,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 ContentType='application/json'
             )
             print(f"📤 Report uploaded to s3://{s3_bucket}/{key}")
+            print(f"🏷️ Scan Context: {context['scan_name']} ({context['runner']})")
         except Exception as e:
             print(f"⚠️ Failed to upload to S3: {e}")
 
@@ -652,6 +704,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Save report
         report = {
+            'scan_context': self.get_scan_context(),
             'scan_date': datetime.now().isoformat(),
             'model': self.model_id,
             'knowledge_base_id': self.kb_id,
