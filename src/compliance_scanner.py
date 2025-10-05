@@ -114,9 +114,6 @@ class ComplianceScanner:
                 comment += "\n"
         
         comment += f"""
-### 🔗 Dashboard
-📊 [View Full ThreatLens Dashboard](https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/dashboard.html?v={int(time.time())})
-
 ### 🛠️ Next Steps
 """
         
