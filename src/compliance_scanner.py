@@ -820,11 +820,12 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
             issues.append({
                 'type': 'vulnerability',
                 'severity': vuln['severity'],
-                'description': f"{vuln['type']} {vuln['id']}: {vuln['description']}",
+                'description': f"{vuln['id']}: {vuln['description']}",
                 'package': vuln['package'],
                 'vulnerability_id': vuln['id'],
                 'source': vuln['type'],
-                'compliance_violations': ['Security']  # Add to compliance tracking
+                'line': 1,  # Add required line field
+                'compliance_violations': ['Security']
             })
         
         if not issues:
