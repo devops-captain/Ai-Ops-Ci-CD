@@ -625,18 +625,22 @@
                     <div class="stat-card critical" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnCriticalCount">0</h3>
                         <p>Critical CVEs</p>
+                        <div class="trend" id="vulnCriticalTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card high" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnHighCount">0</h3>
                         <p>High Severity</p>
+                        <div class="trend" id="vulnHighTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card medium" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnCveCount">0</h3>
                         <p>CVE Database</p>
+                        <div class="trend" id="vulnCveTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card low" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnGithubCount">0</h3>
                         <p>GitHub Advisories</p>
+                        <div class="trend" id="vulnGithubTrend">➡️ Stable</div>
                     </div>
                 </div>
                 <table id="vulnerabilitiesTable">
@@ -1133,23 +1137,43 @@
             
             let vulnStats = { critical: 0, high: 0, cve: 0, github: 0 };
             let vulnData = [];
+            let vulnHistory = { critical: [], high: [], cve: [], github: [] };
             
-            filteredReports.forEach(report => {
+            // Sort reports by date for trend calculation
+            const sortedReports = [...filteredReports].sort((a, b) => 
+                new Date(a.scan_date || 0) - new Date(b.scan_date || 0)
+            );
+            
+            sortedReports.forEach(report => {
                 const scanContext = report.scan_context || {};
                 const contextDisplay = scanContext.is_cicd ? 
                     `🔄 ${scanContext.runner || 'CI/CD'} - ${scanContext.scan_name || 'Unknown'}` : 
                     `💻 Local - ${scanContext.scan_name || 'Unknown'}`;
+                
+                let reportVulns = { critical: 0, high: 0, cve: 0, github: 0 };
                 
                 if (report.results) {
                     report.results.forEach(result => {
                         if (result.issues) {
                             result.issues.forEach(issue => {
                                 if (issue.type === 'vulnerability') {
-                                    // Update stats
-                                    if (issue.severity === 'CRITICAL') vulnStats.critical++;
-                                    if (issue.severity === 'HIGH') vulnStats.high++;
-                                    if (issue.source === 'CVE') vulnStats.cve++;
-                                    if (issue.source === 'GitHub Advisory') vulnStats.github++;
+                                    // Update current stats
+                                    if (issue.severity === 'CRITICAL') {
+                                        vulnStats.critical++;
+                                        reportVulns.critical++;
+                                    }
+                                    if (issue.severity === 'HIGH') {
+                                        vulnStats.high++;
+                                        reportVulns.high++;
+                                    }
+                                    if (issue.source === 'CVE') {
+                                        vulnStats.cve++;
+                                        reportVulns.cve++;
+                                    }
+                                    if (issue.source === 'GitHub Advisory') {
+                                        vulnStats.github++;
+                                        reportVulns.github++;
+                                    }
                                     
                                     vulnData.push({
                                         severity: issue.severity,
@@ -1159,7 +1183,7 @@
                                     const row = tbody.insertRow();
                                     row.innerHTML = `
                                         <td><code>${result.filepath}</code></td>
-                                        <td><span class="severity-badge severity-low">${issue.line || 1}</span></td>
+                                        <td><span class="severity-badge severity-low">Line ${issue.line || 1}</span></td>
                                         <td><strong>${issue.package}</strong></td>
                                         <td><a href="https://nvd.nist.gov/vuln/detail/${issue.vulnerability_id}" target="_blank" style="color: #00ff41;">${issue.vulnerability_id}</a></td>
                                         <td><span class="severity-badge ${issue.source === 'CVE' ? 'severity-high' : 'severity-medium'}">${issue.source}</span></td>
@@ -1171,13 +1195,33 @@
                         }
                     });
                 }
+                
+                // Store history for trends
+                vulnHistory.critical.push(reportVulns.critical);
+                vulnHistory.high.push(reportVulns.high);
+                vulnHistory.cve.push(reportVulns.cve);
+                vulnHistory.github.push(reportVulns.github);
             });
             
-            // Update vulnerability stats
+            // Calculate trends
+            const getTrend = (history) => {
+                if (history.length < 2) return '➡️ Stable';
+                const recent = history.slice(-2);
+                if (recent[1] > recent[0]) return '📈 Increasing';
+                if (recent[1] < recent[0]) return '📉 Decreasing';
+                return '➡️ Stable';
+            };
+            
+            // Update vulnerability stats with trends
             document.getElementById('vulnCriticalCount').textContent = vulnStats.critical;
             document.getElementById('vulnHighCount').textContent = vulnStats.high;
             document.getElementById('vulnCveCount').textContent = vulnStats.cve;
             document.getElementById('vulnGithubCount').textContent = vulnStats.github;
+            
+            document.getElementById('vulnCriticalTrend').textContent = getTrend(vulnHistory.critical);
+            document.getElementById('vulnHighTrend').textContent = getTrend(vulnHistory.high);
+            document.getElementById('vulnCveTrend').textContent = getTrend(vulnHistory.cve);
+            document.getElementById('vulnGithubTrend').textContent = getTrend(vulnHistory.github);
             
             // Draw vulnerability chart
             drawVulnerabilityChart(vulnData);
