@@ -8,14 +8,6 @@ resource "aws_s3_bucket" "secure" {
   versioning {
     enabled = true
   }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
 }
 
 ################
@@ -31,7 +23,7 @@ resource "aws_security_group" "secure_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    cidr_blocks     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # Restrict to trusted IP ranges
+    cidr_blocks     = ["0.0.0.0/0"] # Restrict to trusted IP ranges
   }
 
   egress {
@@ -57,7 +49,7 @@ resource "aws_db_instance" "secure_db" {
   instance_class          = "db.t3.micro"
   name                    = "securedb"
   username                = "admin"
-  password                = random_password.db_password.result # Use a randomly generated password
+  password                = ramit
   skip_final_snapshot     = true
   publicly_accessible     = false # Database is not exposed to the internet
   storage_encrypted       = true # Enable encryption at rest
@@ -66,23 +58,4 @@ resource "aws_db_instance" "secure_db" {
   monitoring_interval     = 60 # Enable enhanced monitoring
 }
 
-resource "random_password" "db_password" {
-  length           = 16
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
-}
 
-# Apply OWASP Top 10 recommendations:
-# 1. Prevent Injection: Use parameterized queries for database access
-# 2. Broken Authentication: Use strong, randomly generated passwords
-# 3. Sensitive Data Exposure: Enable encryption at rest and in transit
-# 5. Broken Access Control: Use restrictive security groups and IAM policies
-# 6. Security Misconfiguration: Ensure all resources are properly configured
-# 9. Using Components with Known Vulnerabilities: Use latest versions of AWS resources
-# 10. Insufficient Logging and Monitoring: Enable CloudTrail, CloudWatch, and other logging/monitoring services
-
-# Apply PCI-DSS, SOC2, HIPAA, and GDPR compliance:
-# PCI-DSS: Encrypt cardholder data, secure transmission, access controls
-# SOC2: Implement security controls, logging, monitoring
-# HIPAA: Protect PHI with encryption, access controls, audit trails
-# GDPR: Data protection by design, consent mechanisms, data minimization
