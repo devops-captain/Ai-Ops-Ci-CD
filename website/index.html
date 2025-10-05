@@ -721,8 +721,9 @@
 
         async function loadReports() {
             try {
-                // Try to get list of reports using S3 API format
-                const listResponse = await fetch('https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=100');
+                // Add cache-busting timestamp
+                const timestamp = new Date().getTime();
+                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=100&v=${timestamp}`);
                 
                 if (!listResponse.ok) {
                     throw new Error('Cannot list S3 objects');
@@ -745,7 +746,7 @@
                 const reports = [];
                 for (const key of keys) {
                     try {
-                        const reportResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/${key}`);
+                        const reportResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/${key}?v=${timestamp}`);
                         if (reportResponse.ok) {
                             const report = await reportResponse.json();
                             report.timestamp = key.match(/(\d{8}_\d{6})/)?.[1] || '';
@@ -1457,6 +1458,12 @@
         window.addEventListener('load', () => {
             loadReports();
             addMatrixClickListeners();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                console.log('Auto-refreshing data...');
+                loadReports();
+            }, 30000);
         });
     </script>
 </body>
