@@ -32,17 +32,17 @@ class ComplianceScanner:
         """Load file hash cache from S3 in CI/CD or local file"""
         cache_data = {}
         
-        # Try S3 cache first (for CI/CD)
+        # Try S3 global cache first (for CI/CD)
         s3_bucket = os.getenv('REPORTS_S3_BUCKET')
         if s3_bucket:
             try:
                 s3 = boto3.client('s3', region_name=self.region)
-                response = s3.get_object(Bucket=s3_bucket, Key='cache/compliance_cache.json')
+                response = s3.get_object(Bucket=s3_bucket, Key='cache/global_compliance_cache.json')
                 cache_data = json.loads(response['Body'].read().decode('utf-8'))
-                print(f"📋 Loaded cache from S3: {len(cache_data)} files")
+                print(f"📋 Loaded global cache from S3: {len(cache_data)} files")
                 return cache_data
             except Exception as e:
-                print(f"📋 No S3 cache found, starting fresh")
+                print(f"📋 No S3 global cache found, starting fresh")
         
         # Fallback to local cache
         try:
@@ -64,18 +64,18 @@ class ComplianceScanner:
         except Exception as e:
             print(f"⚠️ Local cache save error: {e}")
         
-        # Save to S3 for CI/CD persistence
+        # Save to S3 for CI/CD persistence (global cache, not PR-specific)
         s3_bucket = os.getenv('REPORTS_S3_BUCKET')
         if s3_bucket:
             try:
                 s3 = boto3.client('s3', region_name=self.region)
                 s3.put_object(
                     Bucket=s3_bucket,
-                    Key='cache/compliance_cache.json',
+                    Key='cache/global_compliance_cache.json',  # Global cache for all PRs/branches
                     Body=json.dumps(self.file_cache, indent=2),
                     ContentType='application/json'
                 )
-                print(f"📋 Cache saved to S3: {len(self.file_cache)} files")
+                print(f"📋 Global cache saved to S3: {len(self.file_cache)} files")
             except Exception as e:
                 print(f"⚠️ S3 cache save error: {e}")
     
