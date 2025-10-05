@@ -643,14 +643,19 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         """Check dependencies against NIST CVE database"""
         vulnerabilities = []
         
-        for dep in dependencies[:3]:  # Limit to avoid rate limits
+        for dep in dependencies[:2]:  # Limit to 2 for CI/CD performance
             try:
+                print(f"     🔍 Checking CVE for: {dep}")
                 url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-                params = {'keywordSearch': dep, 'resultsPerPage': 3}
+                params = {'keywordSearch': dep, 'resultsPerPage': 2}
                 
-                response = requests.get(url, params=params, timeout=10)
+                response = requests.get(url, params=params, timeout=15)
+                print(f"     📡 CVE API response: {response.status_code}")
+                
                 if response.status_code == 200:
                     data = response.json()
+                    cve_count = len(data.get('vulnerabilities', []))
+                    print(f"     📊 Found {cve_count} CVEs for {dep}")
                     
                     for cve in data.get('vulnerabilities', []):
                         cve_data = cve.get('cve', {})
@@ -672,12 +677,15 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                             'severity': self._get_severity_from_cvss(cvss_score),
                             'description': description[:150] + '...' if len(description) > 150 else description
                         })
+                else:
+                    print(f"     ❌ CVE API error {response.status_code} for {dep}")
                 
-                time.sleep(0.2)  # Rate limiting
+                time.sleep(0.5)  # Longer delay for CI/CD
                 
             except Exception as e:
-                print(f"CVE check failed for {dep}: {e}")
+                print(f"     ❌ CVE check failed for {dep}: {e}")
         
+        print(f"   📊 Total CVE vulnerabilities found: {len(vulnerabilities)}")
         return vulnerabilities
     
     def check_github_advisories(self, dependencies):
@@ -779,12 +787,20 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         vulnerabilities = []
         
         if dependencies:
-            print(f"   🔍 Checking {len(dependencies)} dependencies for vulnerabilities...")
-            vulnerabilities.extend(self.check_cve_vulnerabilities(dependencies))
-            vulnerabilities.extend(self.check_github_advisories(dependencies))
+            print(f"   🔍 Checking {len(dependencies)} dependencies: {dependencies}")
+            try:
+                cve_vulns = self.check_cve_vulnerabilities(dependencies)
+                github_vulns = self.check_github_advisories(dependencies)
+                vulnerabilities.extend(cve_vulns)
+                vulnerabilities.extend(github_vulns)
+                print(f"   📊 Found {len(cve_vulns)} CVE + {len(github_vulns)} GitHub vulnerabilities")
+            except Exception as e:
+                print(f"   ❌ Vulnerability check failed: {e}")
             
             if vulnerabilities:
                 print(f"   ⚠️ Found {len(vulnerabilities)} vulnerabilities")
+        else:
+            print(f"   ℹ️ No dependencies found for vulnerability checking")
         
         # Compliance-focused detection
         issues = self.compliance_detect(code, language, framework, filepath)
