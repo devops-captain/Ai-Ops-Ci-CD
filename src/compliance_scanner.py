@@ -671,7 +671,10 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         """Check dependencies against NIST CVE database"""
         vulnerabilities = []
         
-        for dep_info in dependencies[:2]:  # Limit to 2 for performance
+        max_deps = int(os.getenv('MAX_CVE_DEPS', '0'))  # 0 = no limit
+        deps_to_check = dependencies if max_deps == 0 else dependencies[:max_deps]
+        
+        for dep_info in deps_to_check:
             dep = dep_info['name'] if isinstance(dep_info, dict) else dep_info
             line_num = dep_info.get('line', 1) if isinstance(dep_info, dict) else 1
             
@@ -731,7 +734,10 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         if not github_token:
             return advisories
         
-        for dep in dependencies[:3]:  # Limit to avoid rate limits
+        max_deps = int(os.getenv('MAX_GITHUB_DEPS', '0'))  # 0 = no limit
+        deps_to_check = dependencies if max_deps == 0 else dependencies[:max_deps]
+        
+        for dep in deps_to_check:
             try:
                 url = "https://api.github.com/graphql"
                 query = """
@@ -992,7 +998,10 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Scan files
         results = []
-        for f in files[:10]:  # Limit for cost
+        max_files = int(os.getenv('MAX_FILES_SCAN', '0'))  # 0 = no limit
+        files_to_scan = files if max_files == 0 else files[:max_files]
+        
+        for f in files_to_scan:
             result = self.scan_file(f, auto_fix)
             if result:
                 results.append(result)
@@ -1101,13 +1110,17 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         print(f"\n📄 Report: compliance_report.json")
         
-        # Only return exit code 1 for CI/CD environments, not local runs
+        # Return appropriate exit code based on critical issues and environment
         if by_severity['critical'] > 0:
             print(f"\n⚠️  {by_severity['critical']} critical issues found.")
-            print("In CI/CD: This will block PR merging.")
-            print("Locally: Review and fix critical issues.")
+            if os.getenv('GITHUB_ACTIONS') == 'true' and not auto_fix:
+                print("CI/CD: Blocking PR merge due to critical issues.")
+                return 1  # Block CI/CD on critical issues when auto-fix is disabled
+            else:
+                print("In CI/CD: This will block PR merging.")
+                print("Locally: Review and fix critical issues.")
         
-        return 0  # Always return 0 for local runs - let workflow handle blocking
+        return 0
 
 if __name__ == "__main__":
     import sys
