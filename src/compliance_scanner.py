@@ -650,6 +650,16 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 for match in matches:
                     if not match.startswith('./'):
                         dependencies.append({'name': match, 'line': i})
+                        
+        elif filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
+            # Docker FROM images
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                if line.strip().upper().startswith('FROM'):
+                    match = re.search(r'FROM\s+([^\s]+)', line, re.IGNORECASE)
+                    if match:
+                        img_name = match.group(1).split(':')[0].split('/')[-1]
+                        dependencies.append({'name': img_name, 'line': i})
         
         return dependencies
     
@@ -919,7 +929,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         print(f"Git push: {'ON' if git_push else 'OFF'}\n")
         
         # Collect files
-        extensions = ['.py', '.js', '.ts', '.tf', '.tfvars', '.yaml', '.yml', '.java', '.go', '.sh']
+        extensions = ['.py', '.js', '.ts', '.tf', '.tfvars', '.yaml', '.yml', '.java', '.go', '.sh', 'Dockerfile']
         files = []
         for ext in extensions:
             files.extend([f for f in glob.glob(f"**/*{ext}", recursive=True) 
