@@ -218,13 +218,6 @@ python src/compliance_scanner.py main.tf
 
 ## Performance Benchmarks
 
-### Scan Speed Comparison
-| Tool | 100 Files | 1000 Files | 10000 Files |
-|------|-----------|------------|-------------|
-| AI Scanner | 20 min | 3.5 hours | 35 hours |
-| Terrascan | 2 min | 20 min | 3.5 hours |
-| Checkov | 5 min | 50 min | 8 hours |
-| OPA | 1 min | 10 min | 1.5 hours |
 
 *Note: AI Scanner trades speed for accuracy and intelligence*
 
