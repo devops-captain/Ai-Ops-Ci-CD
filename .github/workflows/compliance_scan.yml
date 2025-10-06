@@ -12,7 +12,7 @@ on:
       auto_fix:
         description: 'Enable auto-fix for security issues'
         required: false
-        default: 'false'
+        default: 'true'
         type: choice
         options:
           - 'true'
