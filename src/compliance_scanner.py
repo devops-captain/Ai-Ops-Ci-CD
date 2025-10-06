@@ -280,7 +280,7 @@ Context:
                     modelId=self.model_id,
                     body=json.dumps({
                         "anthropic_version": "bedrock-2023-05-31",
-                        "max_tokens": 3000,
+                        "max_tokens": int(os.getenv('AI_MAX_TOKENS', '4000')),
                         "temperature": 0.1,
                         "top_p": 0.9,
                         "messages": [{"role": "user", "content": compliance_prompt}]
@@ -297,7 +297,7 @@ Context:
                     modelId=self.model_id,
                     body=json.dumps({
                         "messages": [{"role": "user", "content": [{"text": compliance_prompt}]}],
-                        "inferenceConfig": {"maxTokens": 3000, "temperature": 0.1, "topP": 0.9}
+                        "inferenceConfig": {"maxTokens": int(os.getenv('AI_MAX_TOKENS', '4000')), "temperature": 0.1, "topP": 0.9}
                     })
                 )
                 
@@ -395,6 +395,15 @@ Context:
         
         # Query your KB for relevant RFC rules
         kb_info = self.query_kb_for_rules(code, language)
+        
+        # Validate KB is working properly
+        if not kb_info.get('kb_guidance') or 'standard compliance rules' in kb_info.get('kb_guidance', ''):
+            if os.getenv('REQUIRE_KB', 'false').lower() == 'true':
+                print(f"   ❌ Knowledge Base required but not available")
+                return []
+            else:
+                print(f"   ⚠️ Knowledge Base not available - using standard rules")
+        
         kb_context = ""
         if kb_info['kb_guidance']:
             kb_context = f"\nKnowledge Base Guidance:\n{kb_info['kb_guidance']}\n"
@@ -707,18 +716,21 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                         # Generate fix suggestion
                         fix_suggestion = f"Update {dep} to latest version or apply security patch for {vuln_id}"
                         
+                        max_desc_len = int(os.getenv('MAX_DESCRIPTION_LENGTH', '500'))
+                        
                         vulnerabilities.append({
                             'type': 'CVE',
                             'id': vuln_id,
                             'package': dep,
                             'line': line_num,
                             'severity': self._get_severity_from_cvss(cvss_score),
-                            'description': description[:150] + '...' if len(description) > 150 else description
+                            'description': description[:max_desc_len] + '...' if len(description) > max_desc_len else description
                         })
                 else:
                     print(f"     ❌ CVE API error {response.status_code} for {dep}")
                 
-                time.sleep(0.5)  # Rate limiting
+                cve_delay = float(os.getenv('CVE_API_DELAY', '0.5'))
+                time.sleep(cve_delay)  # Configurable rate limiting
                 
             except Exception as e:
                 print(f"     ❌ CVE check failed for {dep}: {e}")
@@ -770,16 +782,19 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                     for repo in data.get('data', {}).get('search', {}).get('nodes', []):
                         for alert in repo.get('vulnerabilityAlerts', {}).get('nodes', []):
                             advisory = alert.get('securityAdvisory', {})
+                            max_desc_len = int(os.getenv('MAX_DESCRIPTION_LENGTH', '500'))
+                            summary = advisory.get('summary', 'No summary')
                             
                             advisories.append({
                                 'type': 'GitHub Advisory',
                                 'id': advisory.get('ghsaId', 'Unknown'),
                                 'package': dep,
                                 'severity': advisory.get('severity', 'Unknown').upper(),
-                                'description': advisory.get('summary', 'No summary')[:150] + '...'
+                                'description': summary[:max_desc_len] + '...' if len(summary) > max_desc_len else summary
                             })
                 
-                time.sleep(0.2)  # Rate limiting
+                github_delay = float(os.getenv('GITHUB_API_DELAY', '0.2'))
+                time.sleep(github_delay)  # Configurable rate limiting
                 
             except Exception as e:
                 print(f"GitHub Advisory check failed for {dep}: {e}")
@@ -839,6 +854,44 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         return fixed_code
     
+    def check_version_pinning(self, code, filepath):
+        """Check for unpinned dependency versions"""
+        issues = []
+        
+        if filepath.endswith('.js'):
+            # Check for unpinned npm requires
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                if 'require(' in line and not any(op in line for op in ['@', '^', '~', '>=', '<=', '==']):
+                    match = re.search(r'require\(["\']([^"\']+)["\']\)', line)
+                    if match and not match.group(1).startswith('./'):
+                        issues.append({
+                            'type': 'version_pinning',
+                            'severity': 'MEDIUM',
+                            'line': i,
+                            'description': f'Dependency {match.group(1)} not version pinned - security risk',
+                            'package': match.group(1),
+                            'compliance_violations': ['Security', 'Supply Chain']
+                        })
+                        
+        elif filepath.endswith('Dockerfile'):
+            # Check for unpinned Docker images
+            lines = code.split('\n')
+            for i, line in enumerate(lines, 1):
+                if line.strip().upper().startswith('FROM') and ':' not in line:
+                    match = re.search(r'FROM\s+([^\s]+)', line, re.IGNORECASE)
+                    if match:
+                        issues.append({
+                            'type': 'version_pinning',
+                            'severity': 'HIGH',
+                            'line': i,
+                            'description': f'Docker image {match.group(1)} not version pinned - security risk',
+                            'package': match.group(1),
+                            'compliance_violations': ['Security', 'Supply Chain']
+                        })
+        
+        return issues
+    
     def scan_file(self, filepath, auto_fix=False):
         """Scan file with compliance focus and caching"""
         try:
@@ -879,6 +932,12 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Compliance-focused detection
         issues = self.compliance_detect(code, language, framework, filepath)
+        
+        # Add version pinning checks
+        version_issues = self.check_version_pinning(code, filepath)
+        issues.extend(version_issues)
+        if version_issues:
+            print(f"   📌 Found {len(version_issues)} version pinning issues")
         
         # Add vulnerability issues to compliance issues
         for vuln in vulnerabilities:
