@@ -786,10 +786,11 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
     def scan_file(self, filepath, auto_fix=False):
         """Scan file with compliance focus and caching"""
         try:
-            # Check cache first
-            cached_result = self.get_cached_result(filepath)
-            if cached_result:
-                return cached_result
+            # Skip cache if auto-fix is enabled - need fresh AI analysis for fixes
+            if not auto_fix:
+                cached_result = self.get_cached_result(filepath)
+                if cached_result:
+                    return cached_result
             
             with open(filepath, 'r') as f:
                 code = f.read()
