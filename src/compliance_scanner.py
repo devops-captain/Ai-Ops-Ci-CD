@@ -632,7 +632,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         return fixed.strip()
     
     def extract_dependencies(self, code, filepath):
-        """Extract dependencies from code with line numbers"""
+        """Extract dependencies from code with line numbers and versions"""
         dependencies = []
         
         if filepath.endswith('.tf'):
@@ -643,7 +643,10 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                     match = re.search(r'source\s*=\s*["\']([^"\']+)["\']', line)
                     if match:
                         dep_name = match.group(1).split('/')[-1]
-                        dependencies.append({'name': dep_name, 'line': i})
+                        # Try to find version constraint
+                        version_match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', code)
+                        version = version_match.group(1) if version_match else None
+                        dependencies.append({'name': dep_name, 'version': version, 'line': i})
                         
         elif filepath.endswith(('.yaml', '.yml')):
             # Docker images, Helm charts
@@ -652,8 +655,12 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 if 'image:' in line:
                     match = re.search(r'image:\s*["\']?([^"\'\s]+)["\']?', line)
                     if match:
-                        img_name = match.group(1).split(':')[0].split('/')[-1]
-                        dependencies.append({'name': img_name, 'line': i})
+                        full_image = match.group(1)
+                        if ':' in full_image:
+                            img_name, version = full_image.split(':')[0].split('/')[-1], full_image.split(':')[1]
+                        else:
+                            img_name, version = full_image.split('/')[-1], 'latest'
+                        dependencies.append({'name': img_name, 'version': version, 'line': i})
                         
         elif filepath.endswith('.js'):
             # NPM packages from require/import
@@ -662,7 +669,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 matches = re.findall(r'(?:require|import).*?["\']([^"\']+)["\']', line)
                 for match in matches:
                     if not match.startswith('./'):
-                        dependencies.append({'name': match, 'line': i})
+                        dependencies.append({'name': match, 'version': None, 'line': i})
                         
         elif filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
             # Docker FROM images
@@ -671,8 +678,12 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 if line.strip().upper().startswith('FROM'):
                     match = re.search(r'FROM\s+([^\s]+)', line, re.IGNORECASE)
                     if match:
-                        img_name = match.group(1).split(':')[0].split('/')[-1]
-                        dependencies.append({'name': img_name, 'line': i})
+                        full_image = match.group(1)
+                        if ':' in full_image:
+                            img_name, version = full_image.split(':')[0].split('/')[-1], full_image.split(':')[1]
+                        else:
+                            img_name, version = full_image.split('/')[-1], 'latest'
+                        dependencies.append({'name': img_name, 'version': version, 'line': i})
         
         return dependencies
     
@@ -685,12 +696,20 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         for dep_info in deps_to_check:
             dep = dep_info['name'] if isinstance(dep_info, dict) else dep_info
+            version = dep_info.get('version') if isinstance(dep_info, dict) else None
             line_num = dep_info.get('line', 1) if isinstance(dep_info, dict) else 1
             
             try:
-                print(f"     🔍 Checking CVE for: {dep} (line {line_num})")
+                print(f"     🔍 Checking CVE for: {dep} {f'v{version}' if version else '(no version)'} (line {line_num})")
+                
+                # More precise CVE search with version info
+                if version and version != 'latest':
+                    search_query = f"{dep} {version}"
+                else:
+                    search_query = dep
+                    
                 url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-                params = {'keywordSearch': dep, 'resultsPerPage': 2}
+                params = {'keywordSearch': search_query, 'resultsPerPage': 2}
                 
                 response = requests.get(url, params=params, timeout=15)
                 print(f"     📡 CVE API response: {response.status_code}")
