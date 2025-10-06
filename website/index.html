@@ -614,33 +614,44 @@
         <div id="vulnerabilities" class="tab-content">
             <div class="table-container">
                 <h2>🔍 Vulnerability Analysis</h2>
+                
+                <!-- Leadership Vulnerability Chart -->
+                <div style="margin-bottom: 30px; background: rgba(30, 30, 30, 0.95); padding: 20px; border-radius: 10px; border: 1px solid #333;">
+                    <h3 style="color: #00ff41; margin-bottom: 15px;">📊 Executive Vulnerability Overview</h3>
+                    <canvas id="vulnerabilityChart" width="800" height="300" style="max-width: 100%; background: rgba(10, 10, 10, 0.8); border-radius: 5px;"></canvas>
+                </div>
+                
                 <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
                     <div class="stat-card critical" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnCriticalCount">0</h3>
                         <p>Critical CVEs</p>
+                        <div class="trend" id="vulnCriticalTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card high" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnHighCount">0</h3>
                         <p>High Severity</p>
+                        <div class="trend" id="vulnHighTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card medium" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnCveCount">0</h3>
                         <p>CVE Database</p>
+                        <div class="trend" id="vulnCveTrend">➡️ Stable</div>
                     </div>
                     <div class="stat-card low" style="flex: 1; min-width: 200px;">
                         <h3 id="vulnGithubCount">0</h3>
                         <p>GitHub Advisories</p>
+                        <div class="trend" id="vulnGithubTrend">➡️ Stable</div>
                     </div>
                 </div>
                 <table id="vulnerabilitiesTable">
                     <thead>
                         <tr>
                             <th>File</th>
+                            <th>Line</th>
                             <th>Package</th>
                             <th>Vulnerability ID</th>
                             <th>Source</th>
                             <th>Severity</th>
-                            <th>Description</th>
                             <th>Scan Context</th>
                         </tr>
                     </thead>
@@ -723,7 +734,7 @@
             try {
                 // Add cache-busting timestamp
                 const timestamp = new Date().getTime();
-                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=100&v=${timestamp}`);
+                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=10&v=${timestamp}`);
                 
                 if (!listResponse.ok) {
                     throw new Error('Cannot list S3 objects');
@@ -739,23 +750,28 @@
                     .map(key => key.textContent)
                     .filter(key => key.endsWith('.json'))
                     .sort()
-                    .slice(-50); // Get last 50 reports
+                    .slice(-10); // Get last 10 reports only
                 
                 console.log('Found report files:', keys.length);
                 
                 const reports = [];
-                for (const key of keys) {
+                // Load reports in parallel with limit
+                const promises = keys.slice(0, 10).map(async (key) => {
                     try {
                         const reportResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/${key}?v=${timestamp}`);
                         if (reportResponse.ok) {
                             const report = await reportResponse.json();
                             report.timestamp = key.match(/(\d{8}_\d{6})/)?.[1] || '';
-                            reports.push(report);
+                            return report;
                         }
                     } catch (e) {
                         console.warn('Failed to load report:', key, e);
+                        return null;
                     }
-                }
+                });
+                
+                const results = await Promise.all(promises);
+                reports.push(...results.filter(r => r !== null));
 
                 allReports = reports.length > 0 ? reports : getSampleData();
                 console.log('Loaded reports:', allReports.length);
@@ -1125,32 +1141,58 @@
             tbody.innerHTML = '';
             
             let vulnStats = { critical: 0, high: 0, cve: 0, github: 0 };
+            let vulnData = [];
+            let vulnHistory = { critical: [], high: [], cve: [], github: [] };
             
-            filteredReports.forEach(report => {
+            // Sort reports by date for trend calculation
+            const sortedReports = [...filteredReports].sort((a, b) => 
+                new Date(a.scan_date || 0) - new Date(b.scan_date || 0)
+            );
+            
+            sortedReports.forEach(report => {
                 const scanContext = report.scan_context || {};
                 const contextDisplay = scanContext.is_cicd ? 
                     `🔄 ${scanContext.runner || 'CI/CD'} - ${scanContext.scan_name || 'Unknown'}` : 
                     `💻 Local - ${scanContext.scan_name || 'Unknown'}`;
+                
+                let reportVulns = { critical: 0, high: 0, cve: 0, github: 0 };
                 
                 if (report.results) {
                     report.results.forEach(result => {
                         if (result.issues) {
                             result.issues.forEach(issue => {
                                 if (issue.type === 'vulnerability') {
-                                    // Update stats
-                                    if (issue.severity === 'CRITICAL') vulnStats.critical++;
-                                    if (issue.severity === 'HIGH') vulnStats.high++;
-                                    if (issue.source === 'CVE') vulnStats.cve++;
-                                    if (issue.source === 'GitHub Advisory') vulnStats.github++;
+                                    // Update current stats
+                                    if (issue.severity === 'CRITICAL') {
+                                        vulnStats.critical++;
+                                        reportVulns.critical++;
+                                    }
+                                    if (issue.severity === 'HIGH') {
+                                        vulnStats.high++;
+                                        reportVulns.high++;
+                                    }
+                                    if (issue.source === 'CVE') {
+                                        vulnStats.cve++;
+                                        reportVulns.cve++;
+                                    }
+                                    if (issue.source === 'GitHub Advisory') {
+                                        vulnStats.github++;
+                                        reportVulns.github++;
+                                    }
+                                    
+                                    vulnData.push({
+                                        severity: issue.severity,
+                                        package: issue.package
+                                    });
                                     
                                     const row = tbody.insertRow();
                                     row.innerHTML = `
                                         <td><code>${result.filepath}</code></td>
+                                        <td><span class="severity-badge severity-low">Line ${issue.line || 1}</span></td>
                                         <td><strong>${issue.package}</strong></td>
                                         <td><a href="https://nvd.nist.gov/vuln/detail/${issue.vulnerability_id}" target="_blank" style="color: #00ff41;">${issue.vulnerability_id}</a></td>
                                         <td><span class="severity-badge ${issue.source === 'CVE' ? 'severity-high' : 'severity-medium'}">${issue.source}</span></td>
                                         <td><span class="severity-badge severity-${issue.severity.toLowerCase()}">${issue.severity}</span></td>
-                                        <td style="max-width: 300px; word-wrap: break-word;">${issue.description}</td>
                                         <td>${contextDisplay}</td>
                                     `;
                                 }
@@ -1158,13 +1200,105 @@
                         }
                     });
                 }
+                
+                // Store history for trends
+                vulnHistory.critical.push(reportVulns.critical);
+                vulnHistory.high.push(reportVulns.high);
+                vulnHistory.cve.push(reportVulns.cve);
+                vulnHistory.github.push(reportVulns.github);
             });
             
-            // Update vulnerability stats
+            // Calculate trends
+            const getTrend = (history) => {
+                if (history.length < 2) return '➡️ Stable';
+                const recent = history.slice(-2);
+                if (recent[1] > recent[0]) return '📈 Increasing';
+                if (recent[1] < recent[0]) return '📉 Decreasing';
+                return '➡️ Stable';
+            };
+            
+            // Update vulnerability stats with trends
             document.getElementById('vulnCriticalCount').textContent = vulnStats.critical;
             document.getElementById('vulnHighCount').textContent = vulnStats.high;
             document.getElementById('vulnCveCount').textContent = vulnStats.cve;
             document.getElementById('vulnGithubCount').textContent = vulnStats.github;
+            
+            document.getElementById('vulnCriticalTrend').textContent = getTrend(vulnHistory.critical);
+            document.getElementById('vulnHighTrend').textContent = getTrend(vulnHistory.high);
+            document.getElementById('vulnCveTrend').textContent = getTrend(vulnHistory.cve);
+            document.getElementById('vulnGithubTrend').textContent = getTrend(vulnHistory.github);
+            
+            // Draw vulnerability chart
+            drawVulnerabilityChart(vulnData);
+        }
+
+        function drawVulnerabilityChart(vulnData) {
+            const canvas = document.getElementById('vulnerabilityChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Set fixed canvas size
+            canvas.width = 800;
+            canvas.height = 300;
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Count vulnerabilities by severity
+            const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            vulnData.forEach(vuln => {
+                severityCounts[vuln.severity] = (severityCounts[vuln.severity] || 0) + 1;
+            });
+            
+            console.log('Vulnerability data:', vulnData);
+            console.log('Severity counts:', severityCounts);
+            
+            const colors = {
+                CRITICAL: '#ff4444',
+                HIGH: '#ff8800', 
+                MEDIUM: '#ffaa00',
+                LOW: '#00ff41'
+            };
+            
+            const maxCount = Math.max(...Object.values(severityCounts), 1);
+            const barWidth = (width - 100) / 4;
+            const barMaxHeight = height - 80;
+            
+            // Draw bars
+            Object.entries(severityCounts).forEach(([severity, count], index) => {
+                const barHeight = (count / maxCount) * barMaxHeight;
+                const x = 50 + index * barWidth;
+                const y = height - 40 - barHeight;
+                
+                // Gradient
+                const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+                gradient.addColorStop(0, colors[severity]);
+                gradient.addColorStop(1, colors[severity] + '80');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth - 20, barHeight);
+                
+                // Border
+                ctx.strokeStyle = colors[severity];
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, barWidth - 20, barHeight);
+                
+                // Labels
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(severity, x + (barWidth - 20) / 2, height - 20);
+                ctx.fillText(count.toString(), x + (barWidth - 20) / 2, y - 10);
+            });
+            
+            // Title
+            ctx.fillStyle = '#00ff41';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Vulnerability Distribution by Severity', width / 2, 25);
         }
 
         function drawTrendChart() {
@@ -1459,11 +1593,11 @@
             loadReports();
             addMatrixClickListeners();
             
-            // Auto-refresh every 30 seconds
+            // Auto-refresh every 60 seconds (reduced frequency)
             setInterval(() => {
                 console.log('Auto-refreshing data...');
                 loadReports();
-            }, 30000);
+            }, 60000);
         });
     </script>
 </body>

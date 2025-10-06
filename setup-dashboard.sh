@@ -2,7 +2,8 @@
 
 # AI Security Scanner Dashboard Setup Script
 
-set -e
+set -o errexit  # Exit on error
+set -o pipefail # Fail on pipeline errors
 
 # Configuration
 BUCKET_NAME="ai-security-scanner-reports-$(date +%s)"
@@ -12,12 +13,12 @@ echo "🚀 Setting up AI Security Scanner Dashboard..."
 
 # Create S3 bucket for reports
 echo "📦 Creating S3 bucket: $BUCKET_NAME"
-aws s3 mb s3://$BUCKET_NAME --region $REGION
+/usr/bin/aws s3api create-bucket --bucket $BUCKET_NAME --region $REGION --create-bucket-configuration '{"LocationConstraint":"'"$REGION"'"}'
 
 # Enable static website hosting with encryption
 echo "🌐 Enabling static website hosting with encryption..."
-aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document error.html
-aws s3api put-bucket-encryption --bucket $BUCKET_NAME --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+/usr/bin/aws s3api put-bucket-website --bucket $BUCKET_NAME --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"error.html"}}'
+/usr/bin/aws s3api put-bucket-encryption --bucket $BUCKET_NAME --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 
 # Set bucket policy to deny public read access and allow only authorized users
 echo "🔒 Setting bucket policy..."
@@ -51,7 +52,7 @@ cat > bucket-policy.json << EOF
 }
 EOF
 
-aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://bucket-policy.json
+/usr/bin/aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://bucket-policy.json
 
 # Update HTML with bucket name and region
 echo "📝 Updating website configuration..."
@@ -60,16 +61,16 @@ sed -i.bak "s/us-east-1/$REGION/g" website/index-configured.html
 
 # Upload website files with content type
 echo "📤 Uploading website files..."
-aws s3 cp website/index-configured.html s3://$BUCKET_NAME/index.html --content-type text/html
-aws s3 cp website/error.html s3://$BUCKET_NAME/error.html --content-type text/html
+/usr/bin/aws s3 cp website/index-configured.html s3://$BUCKET_NAME/index.html --content-type text/html
+/usr/bin/aws s3 cp website/error.html s3://$BUCKET_NAME/error.html --content-type text/html
 
 # Get website URL
 WEBSITE_URL="https://$BUCKET_NAME.s3-website-$REGION.amazonaws.com"
 
 # Enable logging and monitoring
 echo "🔍 Enabling logging and monitoring..."
-aws cloudtrail create-trail --name ai-security-scanner-dashboard-trail --s3-bucket-name $BUCKET_NAME --is-multi-region-trail --enable-log-file-validation
-aws cloudwatch put-metric-alarm --alarm-name ai-security-scanner-dashboard-alarm --metric-name UnauthorizedAccess --namespace AWS/S3 --statistic Sum --period 300 --threshold 0 --comparison-operator GreaterThanOrEqualToThreshold --dimensions "Name=BucketName,Value=$BUCKET_NAME" "Name=FilterId,Value=EntireBucket" --evaluation-periods 1 --alarm-actions arn:aws:sns:$REGION:123456789012:security-alerts
+/usr/bin/aws cloudtrail create-trail --name ai-security-scanner-dashboard-trail --s3-bucket-name $BUCKET_NAME --is-multi-region-trail --enable-log-file-validation
+/usr/bin/aws cloudwatch put-metric-alarm --alarm-name ai-security-scanner-dashboard-alarm --metric-name UnauthorizedAccess --namespace AWS/S3 --statistic Sum --period 300 --threshold 0 --comparison-operator GreaterThanOrEqualToThreshold --dimensions "Name=BucketName,Value=$BUCKET_NAME" "Name=FilterId,Value=EntireBucket" --evaluation-periods 1 --alarm-actions arn:aws:sns:$REGION:123456789012:security-alerts
 
 echo "✅ Dashboard setup complete!"
 echo ""
