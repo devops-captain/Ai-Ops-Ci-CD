@@ -55,7 +55,7 @@ jobs:
         elif [ "${{ github.event_name }}" = "schedule" ]; then
           AUTO_FIX="true"   # Enable auto-fix for scheduled scans
         else
-          AUTO_FIX="true"   # Enable auto-fix for PR/push events
+          AUTO_FIX="false"  # No auto-fix for PR/push events
         fi
         echo "auto_fix=$AUTO_FIX" >> $GITHUB_OUTPUT
         echo "Auto-fix enabled: $AUTO_FIX"
