@@ -325,7 +325,11 @@ Context:
             '.java': 'Java', '.go': 'Go', '.sh': 'Shell'
         }
         
-        language = ext_map.get(os.path.splitext(filepath)[1], 'Unknown')
+        # Handle Dockerfile specifically
+        if filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
+            language = 'Docker'
+        else:
+            language = ext_map.get(os.path.splitext(filepath)[1], 'Unknown')
         
         # Detect framework
         framework = None

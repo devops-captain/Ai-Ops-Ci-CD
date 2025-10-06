@@ -3,10 +3,10 @@ name: Compliance Security Scan
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main, develop]
-  schedule:
-    - cron: '0 0 * * *'  # Daily scans at midnight
+  # push:
+  #   branches: [main, develop]
+  # schedule:
+  #   - cron: '0 0 * * *'  # Daily scans at midnight
   workflow_dispatch:
     inputs:
       auto_fix:

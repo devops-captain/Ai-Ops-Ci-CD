@@ -6,7 +6,7 @@ const API_KEY = process.env.API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Use parameterized queries and prepared statements to prevent SQL Injection
-const MongoClient = require('mongodb').MongoClient;
+const { MongoClient } = require('mongodb');
 const url = process.env.MONGODB_URI;
 const client = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
 
@@ -25,6 +25,7 @@ function displayUserMessage(message) {
 
 // Use the `child_process.exec()` function with proper input validation to prevent command injection
 const { exec } = require('child_process');
+const validator = require('validator');
 
 function processFile(filename) {
     exec(`cat ${validator.escape(filename)}`, (error, stdout, stderr) => {
@@ -171,7 +172,6 @@ async function incrementCounter() {
 
 // Validate input to prevent injection and use a secure deserialization library
 const validator = require('validator');
-const safeEval = require('safe-eval');
 
 function processUserInput(input) {
     if (typeof input === 'string' && validator.isString(input)) {

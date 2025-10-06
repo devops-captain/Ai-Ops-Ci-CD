@@ -734,7 +734,7 @@
             try {
                 // Add cache-busting timestamp
                 const timestamp = new Date().getTime();
-                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=100&v=${timestamp}`);
+                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=10&v=${timestamp}`);
                 
                 if (!listResponse.ok) {
                     throw new Error('Cannot list S3 objects');
@@ -750,23 +750,28 @@
                     .map(key => key.textContent)
                     .filter(key => key.endsWith('.json'))
                     .sort()
-                    .slice(-50); // Get last 50 reports
+                    .slice(-10); // Get last 10 reports only
                 
                 console.log('Found report files:', keys.length);
                 
                 const reports = [];
-                for (const key of keys) {
+                // Load reports in parallel with limit
+                const promises = keys.slice(0, 10).map(async (key) => {
                     try {
                         const reportResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/${key}?v=${timestamp}`);
                         if (reportResponse.ok) {
                             const report = await reportResponse.json();
                             report.timestamp = key.match(/(\d{8}_\d{6})/)?.[1] || '';
-                            reports.push(report);
+                            return report;
                         }
                     } catch (e) {
                         console.warn('Failed to load report:', key, e);
+                        return null;
                     }
-                }
+                });
+                
+                const results = await Promise.all(promises);
+                reports.push(...results.filter(r => r !== null));
 
                 allReports = reports.length > 0 ? reports : getSampleData();
                 console.log('Loaded reports:', allReports.length);
@@ -1229,15 +1234,16 @@
 
         function drawVulnerabilityChart(vulnData) {
             const canvas = document.getElementById('vulnerabilityChart');
+            if (!canvas) return;
+            
             const ctx = canvas.getContext('2d');
             
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * window.devicePixelRatio;
-            canvas.height = rect.height * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            // Set fixed canvas size
+            canvas.width = 800;
+            canvas.height = 300;
             
-            const width = rect.width;
-            const height = rect.height;
+            const width = canvas.width;
+            const height = canvas.height;
             
             ctx.clearRect(0, 0, width, height);
             
@@ -1246,6 +1252,9 @@
             vulnData.forEach(vuln => {
                 severityCounts[vuln.severity] = (severityCounts[vuln.severity] || 0) + 1;
             });
+            
+            console.log('Vulnerability data:', vulnData);
+            console.log('Severity counts:', severityCounts);
             
             const colors = {
                 CRITICAL: '#ff4444',
@@ -1584,11 +1593,11 @@
             loadReports();
             addMatrixClickListeners();
             
-            // Auto-refresh every 30 seconds
+            // Auto-refresh every 60 seconds (reduced frequency)
             setInterval(() => {
                 console.log('Auto-refreshing data...');
                 loadReports();
-            }, 30000);
+            }, 60000);
         });
     </script>
 </body>
