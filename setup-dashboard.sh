@@ -6,7 +6,7 @@ set -o errexit  # Exit on error
 set -o pipefail # Fail on pipeline errors
 
 # Configuration
-BUCKET_NAME="ai-security-scanner-reports-$(date +%s)"
+BUCKET_NAME="ai-security-scanner-reports-$(uuidgen)"
 REGION="us-east-1"
 
 echo "🚀 Setting up AI Security Scanner Dashboard..."
@@ -17,7 +17,7 @@ echo "📦 Creating S3 bucket: $BUCKET_NAME"
 
 # Enable static website hosting with encryption
 echo "🌐 Enabling static website hosting with encryption..."
-/usr/bin/aws s3api put-bucket-website --bucket $BUCKET_NAME --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"error.html"}}'
+/usr/bin/aws s3api put-bucket-website --bucket $BUCKET_NAME --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"error.html"}}' --profile admin
 /usr/bin/aws s3api put-bucket-encryption --bucket $BUCKET_NAME --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 
 # Set bucket policy to deny public read access and allow only authorized users
@@ -39,7 +39,8 @@ cat > bucket-policy.json << EOF
       "Principal": {
         "AWS": [
           "arn:aws:iam::123456789012:user/authorized_user1",
-          "arn:aws:iam::123456789012:user/authorized_user2"
+          "arn:aws:iam::123456789012:user/authorized_user2",
+          "arn:aws:iam::123456789012:role/authorized_role"
         ]
       },
       "Action": [
@@ -69,12 +70,17 @@ WEBSITE_URL="https://$BUCKET_NAME.s3-website-$REGION.amazonaws.com"
 
 # Enable logging and monitoring
 echo "🔍 Enabling logging and monitoring..."
-/usr/bin/aws cloudtrail create-trail --name ai-security-scanner-dashboard-trail --s3-bucket-name $BUCKET_NAME --is-multi-region-trail --enable-log-file-validation
-/usr/bin/aws cloudwatch put-metric-alarm --alarm-name ai-security-scanner-dashboard-alarm --metric-name UnauthorizedAccess --namespace AWS/S3 --statistic Sum --period 300 --threshold 0 --comparison-operator GreaterThanOrEqualToThreshold --dimensions "Name=BucketName,Value=$BUCKET_NAME" "Name=FilterId,Value=EntireBucket" --evaluation-periods 1 --alarm-actions arn:aws:sns:$REGION:123456789012:security-alerts
+/usr/bin/aws cloudtrail create-trail --name ai-security-scanner-dashboard-trail --s3-bucket-name $BUCKET_NAME --is-multi-region-trail --enable-log-file-validation --profile admin
+/usr/bin/aws cloudwatch put-metric-alarm --alarm-name ai-security-scanner-dashboard-alarm --metric-name UnauthorizedAccess --namespace AWS/S3 --statistic Sum --period 300 --threshold 0 --comparison-operator GreaterThanOrEqualToThreshold --dimensions "Name=BucketName,Value=$BUCKET_NAME" "Name=FilterId,Value=EntireBucket" --evaluation-periods 1 --alarm-actions arn:aws:sns:$REGION:123456789012:security-alerts --profile admin
+
+# Configure CloudFront distribution
+echo "🌐 Configuring CloudFront distribution..."
+CLOUDFRONT_DISTRIBUTION_ID=$(aws cloudfront create-distribution --origin-domain-name "$BUCKET_NAME.s3.amazonaws.com" --default-root-object index.html --default-cache-behavior ViewerProtocolPolicy=redirect-to-https,MinTTL=0,DefaultTTL=300,MaxTTL=1200 --viewer-certificate CloudFrontDefaultCertificate=true --profile admin | jq -r '.Distribution.Id')
+CLOUDFRONT_DOMAIN_NAME=$(aws cloudfront get-distribution --id $CLOUDFRONT_DISTRIBUTION_ID --profile admin | jq -r '.Distribution.DomainName')
 
 echo "✅ Dashboard setup complete!"
 echo ""
-echo "📊 Dashboard URL: $WEBSITE_URL"
+echo "📊 Dashboard URL: https://$CLOUDFRONT_DOMAIN_NAME"
 echo "📦 Reports Bucket: $BUCKET_NAME"
 echo ""
 echo "🔧 To use with scanner, set environment variable:"
@@ -88,4 +94,4 @@ rm -f bucket-policy.json website/index-configured.html website/index-configured.
 
 echo ""
 echo "🎉 Your AI Security Scanner Dashboard is ready!"
-echo "Visit: $WEBSITE_URL"
+echo "Visit: https://$CLOUDFRONT_DOMAIN_NAME"

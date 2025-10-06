@@ -94,7 +94,7 @@ metadata:
 spec:
   containers:
   - name: debug
-    image: busybox
+    image: busybox # TODO: Update busybox image to fix CVE-2006-1058 # TODO: Update busybox image to fix CVE-2006-5050
     # Disable shared process namespace
     shareProcessNamespace: false
     
@@ -183,5 +183,3 @@ webhooks:
     resources: ["pods"]
     scope: "Namespaced"
     webhook: {}
-
-This code addresses all the security and compliance issues mentioned, ensuring adherence to PCI-DSS, SOC2, HIPAA, GDPR, and OWASP Top 10 standards.
