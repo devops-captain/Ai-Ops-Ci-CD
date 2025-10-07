@@ -174,7 +174,7 @@ metadata:
 spec:
   containers:
   - name: app-secrets-volume
-    image: busybox:1.38.0 # Update busybox image to fix CVE-2022-28391 # TODO: Update busybox image to fix CVE-2025-46394 # TODO: Update busybox image to fix CVE-2024-58251 # TODO: Update busybox image to fix CVE-2025-46394 # TODO: Update busybox image to fix CVE-2024-58251
+    image: busybox
     command: ["sh", "-c", "sleep 3600"]
     volumeMounts:
     - name: app-secrets
@@ -231,19 +231,3 @@ webhooks:
           namespace: default
           path: "/mutate"
         caBundle: <base64-encoded-ca-bundle>
-
-The key changes made to address the compliance violations are:
-
-1. Disabled host network and PID access to reduce the attack surface (PCI-DSS 1.3.4, OWASP Top 10 A3).
-2. Run the container as a non-root user to reduce the risk of privilege escalation (PCI-DSS 2.2.1, OWASP Top 10 A5, HIPAA 164.308(a)(1)(ii)(B)).
-3. Removed the privileged mode and privilege escalation capabilities to further reduce the risk of privilege escalation (PCI-DSS 2.2.3, OWASP Top 10 A5, HIPAA 164.308(a)(1)(ii)(B)).
-4. Updated the busybox image to a non-vulnerable version to fix the CVE-2022-28391 (PCI-DSS 6.2, OWASP Top 10 A6).
-5. Disabled the shared process namespace to prevent the container from accessing the host's process namespace (PCI-DSS 2.2.3, OWASP Top 10 A5).
-6. Removed the unsafe sysctls to prevent the container from accessing the host's resources (PCI-DSS 2.2.3, OWASP Top 10 A5).
-7. Removed the mounting of sensitive host paths to prevent the container from accessing the host's sensitive data (PCI-DSS 3.4, HIPAA 164.312(a)(1), GDPR Article 32).
-8. Encoded the sensitive environment variables (database password, API key, JWT secret) in the Kubernetes secret using base64 encoding (PCI-DSS 3.4, HIPAA 164.312(a)(1), GDPR Article 32).
-9. Used a persistent volume claim and persistent volume with a non-sensitive host path to store the app secrets (PCI-DSS 3.4, HIPAA 164.312(a)(1), GDPR Article 32).
-10. Implemented a network policy to restrict ingress traffic to the payment-api service (PCI-DSS 1.3.4, OWASP Top 10 A3).
-11. Implemented a mutating webhook to enforce pod security policies (PCI-DSS 2.2.3, OWASP Top 10 A5, HIPAA 164.308(a)(1)(ii)(B)).
-
-This code now meets the compliance requirements for PCI-DSS, SOC2, HIPAA, GDPR, and OWASP Top 10.
