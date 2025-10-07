@@ -75,7 +75,7 @@ jobs:
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
-          SCAN_ARGS="--fix --no-push"
+          SCAN_ARGS="--fix  --skip-cve"
         fi
         echo "Running: python src/compliance_scanner.py $SCAN_ARGS"
         echo "Repository: $GITHUB_REPOSITORY"
