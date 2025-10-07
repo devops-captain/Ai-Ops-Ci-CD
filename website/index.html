@@ -732,33 +732,27 @@
 
         async function loadReports() {
             try {
-                // Add cache-busting timestamp
-                const timestamp = new Date().getTime();
-                const listResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/?list-type=2&prefix=reports/&max-keys=10&v=${timestamp}`);
+                // Dynamically fetch all reports from manifest
+                let reportFiles = [];
                 
-                if (!listResponse.ok) {
-                    throw new Error('Cannot list S3 objects');
+                try {
+                    const manifestResponse = await fetch('reports-manifest.json');
+                    if (manifestResponse.ok) {
+                        const manifest = await manifestResponse.json();
+                        reportFiles = manifest.reports || [];
+                        console.log('Loaded manifest with', reportFiles.length, 'reports');
+                    }
+                } catch (e) {
+                    console.log('No manifest found, using fallback');
                 }
                 
-                const listText = await listResponse.text();
-                console.log('S3 response received');
-                
-                // Parse S3 XML listing
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(listText, 'text/xml');
-                const keys = Array.from(xml.querySelectorAll('Key'))
-                    .map(key => key.textContent)
-                    .filter(key => key.endsWith('.json'))
-                    .sort()
-                    .slice(-10); // Get last 10 reports only
-                
-                console.log('Found report files:', keys.length);
+                console.log('Found report files:', reportFiles.length);
                 
                 const reports = [];
-                // Load reports in parallel with limit
-                const promises = keys.slice(0, 10).map(async (key) => {
+                // Load reports in parallel
+                const promises = reportFiles.map(async (key) => {
                     try {
-                        const reportResponse = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/${key}?v=${timestamp}`);
+                        const reportResponse = await fetch(`${key}`);
                         if (reportResponse.ok) {
                             const report = await reportResponse.json();
                             report.timestamp = key.match(/(\d{8}_\d{6})/)?.[1] || '';
@@ -794,7 +788,7 @@
                 const reports = [];
                 for (const file of recentReports) {
                     try {
-                        const response = await fetch(`https://ai-security-scanner-reports-1759503117.s3.amazonaws.com/reports/${file}`);
+                        const response = await fetch(`reports/${file}`);
                         if (response.ok) {
                             const report = await response.json();
                             report.timestamp = file.replace('_compliance_report.json', '');
