@@ -1244,8 +1244,8 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         # Upload to S3 if configured
         self.upload_to_s3(report)
         
-        # Post PR comment if in CI/CD and not disabled
-        if os.environ.get('GITHUB_ACTIONS') == 'true' and not os.environ.get('DISABLE_PYTHON_PR_COMMENT'):
+        # Post PR comment if in CI/CD
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
             self.post_pr_comment(report)
         
         # Save cache after scan
