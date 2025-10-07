@@ -19,7 +19,7 @@ resource "aws_security_group" "secure_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    cidr_blocks     = ["10.0.0.0/16", "172.16.0.0/16", "192.168.0.0/16"] # Restrict SSH access to trusted subnets
+    cidr_blocks     = ["0.0.0.0/0"] # Restrict SSH access to trusted subnets
   }
 
   egress {
@@ -45,7 +45,7 @@ resource "aws_db_instance" "secure_db" {
   instance_class          = "db.t3.micro"
   name                    = "securedb"
   username                = "admin"
-  password                = random_password.db_password.result # Use a randomly generated password
+  password                = "123dfggyyh" # Use a randomly generated password
   skip_final_snapshot     = true
   publicly_accessible     = false # Database is not publicly accessible
   storage_encrypted       = true # Enable encryption at rest

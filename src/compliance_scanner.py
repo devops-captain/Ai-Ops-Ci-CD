@@ -260,14 +260,7 @@ class ComplianceScanner:
     def call_ai_with_compliance(self, prompt):
         """AI call with compliance context"""
         compliance_prompt = f"""
-You are a security expert specializing in compliance standards: PCI-DSS, SOC2, HIPAA, GDPR, OWASP Top 10.
-
-Context:
-- PCI-DSS: Protect cardholder data, encrypt transmission, implement access controls
-- SOC2: Security, availability, confidentiality controls
-- HIPAA: Protect PHI with encryption, access controls, audit logs
-- GDPR: Data protection by design, consent, minimization
-- OWASP: Prevent injection, broken auth, data exposure
+You are a security expert. Return ONLY the fixed code. NO explanations. STOP after code ends.
 
 Analyze this code deterministically and consistently:
 
@@ -312,7 +305,36 @@ Analyze this code deterministically and consistently:
             output_tokens = len(output) / 4
             self.total_cost += (input_tokens * 0.00035 / 1000) + (output_tokens * 0.0014 / 1000)
             
-            return output
+            # Aggressive explanation removal
+            lines = output.split('\n')
+            code_lines = []
+            explanation_started = False
+            
+            for line in lines:
+                # Check if explanation section starts
+                if any(pattern in line.lower() for pattern in [
+                    'the key changes', 'explanation of', 'changes made', 
+                    'to address the', 'security improvements', 'compliance',
+                    'these changes address', 'key changes made', 'summary of changes',
+                    'security and compliance', 'pci-dss', 'hipaa', 'gdpr',
+                    'this code now meets', 'updated the', 'disabled the',
+                    'removed the', 'encoded the', 'implemented a'
+                ]):
+                    explanation_started = True
+                    break
+                    
+                # Skip numbered explanation lists
+                if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')):
+                    explanation_started = True
+                    break
+                    
+                if not explanation_started:
+                    code_lines.append(line)
+            
+            # Join back and clean up
+            cleaned_output = '\n'.join(code_lines).strip()
+            
+            return cleaned_output
             
         except Exception as e:
             self.log_error(str(e))
@@ -344,6 +366,11 @@ Analyze this code deterministically and consistently:
     
     def query_kb_for_rules(self, code_snippet, language):
         """Query your KB to get specific RFC rules for the code"""
+        # Speed optimization: Skip KB queries if disabled
+        if os.getenv('SKIP_KB_QUERY', 'false').lower() == 'true':
+            print(f"   ⚡ Skipping KB query for speed")
+            return {'kb_guidance': '', 's3_sources': []}
+            
         try:
             bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=self.region)
             
@@ -691,6 +718,11 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
     
     def check_cve_vulnerabilities(self, dependencies):
         """Check dependencies against NIST CVE database"""
+        # Speed optimization: Skip CVE checks if disabled
+        if os.getenv('SKIP_CVE_CHECK', 'false').lower() == 'true':
+            print(f"   ⚡ Skipping CVE checks for speed")
+            return []
+            
         vulnerabilities = []
         
         max_deps = int(os.getenv('MAX_CVE_DEPS', '0'))  # 0 = no limit
@@ -711,15 +743,15 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                     search_query = dep
                     
                 url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-                params = {'keywordSearch': search_query, 'resultsPerPage': 2}
+                params = {'keywordSearch': search_query, 'resultsPerPage': 1}  # Reduced for speed
                 
-                # Retry logic with exponential backoff
-                max_retries = 3
-                base_delay = 1
+                # Faster retry logic
+                max_retries = 2  # Reduced from 3
+                base_delay = 0.5  # Reduced from 1
                 
                 for attempt in range(max_retries):
                     try:
-                        response = requests.get(url, params=params, timeout=15)
+                        response = requests.get(url, params=params, timeout=8)  # Reduced from 15
                         print(f"     📡 CVE API response: {response.status_code}")
                         
                         if response.status_code == 200:
@@ -781,7 +813,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 else:
                     print(f"     ❌ CVE API error {response.status_code} for {dep}")
                 
-                cve_delay = float(os.getenv('CVE_API_DELAY', '0.5'))
+                cve_delay = float(os.getenv('CVE_API_DELAY', '0.2'))  # Reduced from 0.5
                 time.sleep(cve_delay)  # Configurable rate limiting
                 
             except Exception as e:
@@ -1240,6 +1272,7 @@ if __name__ == "__main__":
     profile_name = None
     auto_fix = False
     git_push = False
+    skip_cve = False
     
     for arg in sys.argv[1:]:
         if arg.startswith('--profile='):
@@ -1251,6 +1284,34 @@ if __name__ == "__main__":
         elif arg == '--fix-push':
             auto_fix = True
             git_push = True
+        elif arg == '--skip-cve':
+            skip_cve = True
+        elif arg == '--help' or arg == '-h':
+            print("""
+🔒 ThreatLens Compliance Scanner
+
+Usage: python3 compliance_scanner.py [OPTIONS]
+
+Options:
+  --fix              Apply AI-generated security fixes
+  --push             Push fixes to git (requires --fix)
+  --fix-push         Apply fixes and push to git
+  --skip-cve         Skip CVE vulnerability checks (faster scanning)
+  --profile=NAME     Use specific AWS profile
+  --files=FILE1,FILE2 Scan specific files only
+  --help, -h         Show this help message
+
+Examples:
+  python3 compliance_scanner.py                    # Scan only
+  python3 compliance_scanner.py --fix              # Scan and fix
+  python3 compliance_scanner.py --fix --skip-cve   # Fast scan and fix
+  python3 compliance_scanner.py --files=test.tf    # Scan specific file
+            """)
+            sys.exit(0)
+    
+    # Set environment variable for CVE skipping
+    if skip_cve:
+        os.environ['SKIP_CVE_CHECK'] = 'true'
     
     scanner = ComplianceScanner(profile_name=profile_name)
     exit(scanner.run(auto_fix=auto_fix, git_push=git_push))
