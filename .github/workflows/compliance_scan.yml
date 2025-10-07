@@ -103,10 +103,10 @@ jobs:
             const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));
             
             comment += `### 📊 Summary\n`;
-            comment += `- **Files scanned:** ${report.files_scanned}\n`;
-            comment += `- **Total issues:** ${report.total_issues}\n`;
-            comment += `- **AI calls:** ${report.ai_calls}\n`;
-            comment += `- **Cost:** $${report.cost.toFixed(4)}\n`;
+            comment += `- **Files scanned:** ${report.files_scanned || 0}\n`;
+            comment += `- **Total issues:** ${report.total_issues || 0}\n`;
+            comment += `- **AI calls:** ${report.ai_calls || 0}\n`;
+            comment += `- **Cost:** $${(report.cost || 0).toFixed(4)}\n`;
             
             if (report.fixed > 0) {
               comment += `- **Auto-fixed:** ${report.fixed} files ✅\n`;
@@ -119,21 +119,22 @@ jobs:
             }
             
             comment += `\n### 🎯 Issues by Severity\n`;
-            const severities = ['critical', 'high', 'medium', 'low', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+            const bySevrityData = report.by_severity || {};
             let hasSeverityIssues = false;
             
-            for (const severity of severities) {
-              const count = report.by_severity[severity];
-              if (count > 0) {
+            // Check both lowercase and uppercase severity keys
+            const allSeverities = {...bySevrityData};
+            for (const [key, value] of Object.entries(bySevrityData)) {
+              if (value > 0) {
                 hasSeverityIssues = true;
-                const emoji = severity.toLowerCase() === 'critical' ? '🔴' : 
-                             severity.toLowerCase() === 'high' ? '🟠' : 
-                             severity.toLowerCase() === 'medium' ? '🟡' : '🟢';
-                comment += `- ${emoji} **${severity.toUpperCase()}**: ${count}\n`;
+                const emoji = key.toLowerCase() === 'critical' ? '🔴' : 
+                             key.toLowerCase() === 'high' ? '🟠' : 
+                             key.toLowerCase() === 'medium' ? '🟡' : '🟢';
+                comment += `- ${emoji} **${key.toUpperCase()}**: ${value}\n`;
               }
             }
             
-            if (!hasSeverityIssues) {
+            if (!hasSeverityIssues && (report.total_issues || 0) === 0) {
               comment += `✅ No issues found\n`;
             }
             
@@ -148,52 +149,62 @@ jobs:
               }
             }
             
-            // Detailed findings by file
+            // Detailed findings by file - match original format
             if (report.results && report.results.length > 0) {
-              comment += `\n### 🔍 Detailed Findings\n\n`;
+              let hasAnyIssues = false;
               
+              // Check if any file has issues
               for (const result of report.results) {
                 if (result.issues && result.issues.length > 0) {
-                  comment += `#### 📁 \`${result.filepath}\` (${result.language})\n`;
-                  
-                  // Sort issues by severity
-                  const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
-                  result.issues.sort((a, b) => (severityOrder[a.severity] || 99) - (severityOrder[b.severity] || 99));
-                  
-                  for (const issue of result.issues) {
-                    const severity = issue.severity.toLowerCase();
-                    const emoji = severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'medium' ? '🟡' : '🟢';
+                  hasAnyIssues = true;
+                  break;
+                }
+              }
+              
+              if (hasAnyIssues) {
+                comment += `\n### 🔍 Detailed Findings\n\n`;
+                
+                for (const result of report.results) {
+                  if (result.issues && result.issues.length > 0) {
+                    comment += `#### 📁 \`${result.filepath}\` (${result.language})\n\n`;
                     
-                    comment += `\n${emoji} **Line ${issue.line}** [${issue.severity}]\n`;
-                    comment += `**Issue:** ${issue.description}\n`;
+                    // Sort issues by severity
+                    const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+                    result.issues.sort((a, b) => (severityOrder[a.severity] || 99) - (severityOrder[b.severity] || 99));
                     
-                    if (issue.type === 'vulnerability') {
-                      if (issue.vulnerability_id) comment += `**CVE/ID:** ${issue.vulnerability_id}\n`;
-                      if (issue.package) comment += `**Package:** ${issue.package}\n`;
-                      if (issue.source) comment += `**Source:** ${issue.source}\n`;
-                    }
-                    
-                    if (issue.compliance_violations && issue.compliance_violations.length > 0) {
-                      comment += `**Violates:** ${issue.compliance_violations.join(', ')}\n`;
-                    }
-                    
-                    if (issue.remediation) {
-                      comment += `**Fix:** ${issue.remediation}\n`;
-                    }
-                    
-                    if (issue.kb_rule) {
-                      comment += `**KB Rule:** ${issue.kb_rule}\n`;
-                    }
-                    
-                    if (issue.s3_sources && issue.s3_sources.length > 0) {
-                      comment += `**Sources:** ${issue.s3_sources.join(', ')}\n`;
-                    }
-                    
-                    if (issue.rfc_document) {
-                      comment += `**RFC:** ${issue.rfc_document}\n`;
+                    for (const issue of result.issues) {
+                      const severity = issue.severity.toUpperCase();
+                      const emoji = severity === 'CRITICAL' ? '🔴' : severity === 'HIGH' ? '🟠' : severity === 'MEDIUM' ? '🟡' : '🟢';
+                      
+                      comment += `${emoji} Line ${issue.line} (${severity}): ${issue.description}\n`;
+                      
+                      if (issue.compliance_violations && issue.compliance_violations.length > 0) {
+                        comment += `📋 Violates: ${issue.compliance_violations.join(', ')}\n`;
+                      }
+                      
+                      if (issue.rfc_document) {
+                        comment += `📄 RFC Document: ${issue.rfc_document}\n`;
+                      }
+                      
+                      if (issue.s3_sources && issue.s3_sources.length > 0) {
+                        comment += `🗂️ S3 Sources: ${issue.s3_sources.join(', ')}\n`;
+                      }
+                      
+                      if (issue.kb_rule) {
+                        comment += `📚 KB Rule: ${issue.kb_rule}\n`;
+                      }
+                      
+                      if (issue.rule_source) {
+                        comment += `🔗 Source: ${issue.rule_source}\n`;
+                      }
+                      
+                      if (issue.remediation) {
+                        comment += `🔧 Fix: ${issue.remediation}\n`;
+                      }
+                      
+                      comment += `\n`;
                     }
                   }
-                  comment += `\n`;
                 }
               }
             }
