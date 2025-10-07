@@ -269,6 +269,8 @@ Context:
 - GDPR: Data protection by design, consent, minimization
 - OWASP: Prevent injection, broken auth, data exposure
 
+Analyze this code deterministically and consistently:
+
 {prompt}
 """
         
@@ -281,7 +283,7 @@ Context:
                     body=json.dumps({
                         "anthropic_version": "bedrock-2023-05-31",
                         "max_tokens": int(os.getenv('AI_MAX_TOKENS', '4000')),
-                        "temperature": 0.1,
+                        "temperature": 0,
                         "top_p": 0.9,
                         "messages": [{"role": "user", "content": compliance_prompt}]
                     })
@@ -297,7 +299,7 @@ Context:
                     modelId=self.model_id,
                     body=json.dumps({
                         "messages": [{"role": "user", "content": [{"text": compliance_prompt}]}],
-                        "inferenceConfig": {"maxTokens": int(os.getenv('AI_MAX_TOKENS', '4000')), "temperature": 0.1, "topP": 0.9}
+                        "inferenceConfig": {"maxTokens": int(os.getenv('AI_MAX_TOKENS', '4000')), "temperature": 0, "topP": 0.9}
                     })
                 )
                 
@@ -711,8 +713,39 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
                 params = {'keywordSearch': search_query, 'resultsPerPage': 2}
                 
-                response = requests.get(url, params=params, timeout=15)
-                print(f"     📡 CVE API response: {response.status_code}")
+                # Retry logic with exponential backoff
+                max_retries = 3
+                base_delay = 1
+                
+                for attempt in range(max_retries):
+                    try:
+                        response = requests.get(url, params=params, timeout=15)
+                        print(f"     📡 CVE API response: {response.status_code}")
+                        
+                        if response.status_code == 200:
+                            # Success - process results
+                            break
+                        elif response.status_code == 429:
+                            if attempt < max_retries - 1:
+                                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                                print(f"     ⏳ Rate limited, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                                time.sleep(delay)
+                                continue
+                            else:
+                                print(f"     ❌ CVE API rate limited after {max_retries} attempts for {dep}")
+                                continue  # Skip this dependency
+                        else:
+                            print(f"     ❌ CVE API error {response.status_code} for {dep}")
+                            break
+                    except requests.exceptions.RequestException as e:
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)
+                            print(f"     ⏳ Request failed, retrying in {delay}s: {e}")
+                            time.sleep(delay)
+                            continue
+                        else:
+                            print(f"     ❌ CVE API request failed after {max_retries} attempts: {e}")
+                            break
                 
                 if response.status_code == 200:
                     data = response.json()
