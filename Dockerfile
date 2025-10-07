@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 # TODO: Update ubuntu base image to fix CVE-2022-44544 # TODO: Update ubuntu base image to fix CVE-2023-45866
+FROM ubuntu:22.04 # TODO: Update ubuntu base image to fix CVE-2022-44544 # TODO: Update ubuntu base image to fix CVE-2023-45866 # TODO: Update ubuntu base image to fix CVE-2022-44544 # TODO: Update ubuntu base image to fix CVE-2023-45866
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
