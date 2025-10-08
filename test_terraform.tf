@@ -7,7 +7,7 @@ resource "aws_s3_bucket" "secure" {
 
 }
 
-################
+####################
 # Secure Security Group
 ################
 resource "aws_security_group" "secure_sg" {
