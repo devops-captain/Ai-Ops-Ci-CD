@@ -3,7 +3,7 @@ resource "aws_s3_bucket" "bad" {
   acl    = "private"
 
   }
-
+####
   versioning {
     enabled = true
   }
