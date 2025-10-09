@@ -3,16 +3,16 @@ name: Compliance Security Scan
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  # push:
-  #   branches: [main, develop]
-  # schedule:
-  #   - cron: '0 0 * * *'  # Daily scans at midnight
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * *'  # Daily scans at midnight
   workflow_dispatch:
     inputs:
       auto_fix:
         description: 'Enable auto-fix for security issues'
         required: false
-        default: 'true'
+        default: 'false'
         type: choice
         options:
           - 'true'
@@ -38,7 +38,7 @@ jobs:
         python-version: '3.11'
     
     - name: Install dependencies
-      run: pip install boto3 requests
+      run: pip install boto3
     
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -54,10 +54,8 @@ jobs:
           AUTO_FIX="${{ github.event.inputs.auto_fix }}"
         elif [ "${{ github.event_name }}" = "schedule" ]; then
           AUTO_FIX="true"   # Enable auto-fix for scheduled scans
-        elif [ "${{ github.event_name }}" = "pull_request" ]; then
-          AUTO_FIX="${{ vars.PR_AUTO_FIX || 'true' }}"   # Configurable via repository variable
         else
-          AUTO_FIX="false"  # Default for push events
+          AUTO_FIX="false"  # No auto-fix for PR/push events
         fi
         echo "auto_fix=$AUTO_FIX" >> $GITHUB_OUTPUT
         echo "Auto-fix enabled: $AUTO_FIX"
@@ -67,24 +65,19 @@ jobs:
         AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
         BEDROCK_KB_ID: ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}
         BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
-        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET || 'ai-security-scanner-reports-1759503117' }}
-        GITHUB_PR_NUMBER: ${{ github.event.number }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        DISABLE_PYTHON_PR_COMMENT: "true"
+        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
-          SCAN_ARGS="--fix  --skip-cve"
+          SCAN_ARGS="--fix --no-push"
         fi
         echo "Running: python src/compliance_scanner.py $SCAN_ARGS"
-        echo "Repository: $GITHUB_REPOSITORY"
-        echo "Branch: $GITHUB_REF_NAME"
-        echo "PR Number: $GITHUB_PR_NUMBER"
         echo "Using AWS Region: $AWS_REGION"
         echo "Using KB ID: $BEDROCK_KB_ID"
         echo "Using Model: $BEDROCK_MODEL_ID"
-        echo "Using S3 Bucket: $REPORTS_S3_BUCKET (includes cache persistence)"
+        if [ -n "$REPORTS_S3_BUCKET" ]; then
+          echo "Reports will be uploaded to: s3://$REPORTS_S3_BUCKET"
+        fi
         python src/compliance_scanner.py $SCAN_ARGS
     
     - name: Generate PR Comment
@@ -93,7 +86,7 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          let comment = `## 🔒 AI-Powered Compliance Security Scan Results\n\n`;
+          let comment = `## 🔒 Compliance Security Scan Results\n\n`;
           comment += `**Auto-fix:** ${{ steps.params.outputs.auto_fix }}\n`;
           comment += `**Model:** ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}\n`;
           comment += `**Knowledge Base:** ${{ vars.BEDROCK_KB_ID || '6OFPQYR1JK' }}\n`;
@@ -103,139 +96,94 @@ jobs:
             const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));
             
             comment += `### 📊 Summary\n`;
-            comment += `- **Files scanned:** ${report.files_scanned || 0}\n`;
-            comment += `- **Total issues:** ${report.total_issues || 0}\n`;
-            comment += `- **AI calls:** ${report.ai_calls || 0}\n`;
-            comment += `- **Cost:** $${(report.cost || 0).toFixed(4)}\n`;
+            comment += `- Files scanned: ${report.files_scanned}\n`;
+            comment += `- Issues found: ${report.total_issues}\n`;
+            comment += `- AI calls: ${report.ai_calls}\n`;
+            comment += `- Cost: $${report.cost.toFixed(4)}\n`;
             
             if (report.fixed > 0) {
               comment += `- **Auto-fixed:** ${report.fixed} files ✅\n`;
             }
             
-            // Vulnerability summary
-            const vulnSummary = report.vulnerability_summary || {};
-            if (vulnSummary.total_vulnerabilities > 0) {
-              comment += `- **Vulnerabilities:** ${vulnSummary.total_vulnerabilities} (Critical: ${vulnSummary.critical_vulns || 0}, CVEs: ${vulnSummary.cve_findings || 0})\n`;
-            }
-            
-            comment += `\n### 🎯 Issues by Severity\n`;
-            const bySevrityData = report.by_severity || {};
-            let hasSeverityIssues = false;
-            
-            // Check both lowercase and uppercase severity keys
-            const allSeverities = {...bySevrityData};
-            for (const [key, value] of Object.entries(bySevrityData)) {
-              if (value > 0) {
-                hasSeverityIssues = true;
-                const emoji = key.toLowerCase() === 'critical' ? '🔴' : 
-                             key.toLowerCase() === 'high' ? '🟠' : 
-                             key.toLowerCase() === 'medium' ? '🟡' : '🟢';
-                comment += `- ${emoji} **${key.toUpperCase()}**: ${value}\n`;
+            comment += `\n### 🎯 By Severity\n`;
+            for (const [severity, count] of Object.entries(report.by_severity)) {
+              if (count > 0) {
+                const emoji = severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'medium' ? '🟡' : '🟢';
+                comment += `- ${emoji} **${severity.toUpperCase()}**: ${count}\n`;
               }
             }
             
-            if (!hasSeverityIssues && (report.total_issues || 0) === 0) {
-              comment += `✅ No issues found\n`;
+            if (Object.keys(report.compliance_summary || {}).length > 0) {
+              comment += `\n### 📋 Compliance Violations\n`;
+              for (const [standard, data] of Object.entries(report.compliance_summary)) {
+                comment += `- **${standard}**: ${data.issues} issues (${data.critical} critical, ${data.high} high)\n`;
+              }
             }
             
-            // Compliance violations summary
-            if (Object.keys(report.compliance_summary || {}).length > 0) {
-              comment += `\n### 📋 Compliance Standards Violated\n`;
-              for (const [standard, data] of Object.entries(report.compliance_summary)) {
-                comment += `- **${standard}**: ${data.issues} issues`;
-                if (data.critical > 0) comment += ` (🔴 ${data.critical} critical)`;
-                if (data.high > 0) comment += ` (🟠 ${data.high} high)`;
+            // Add detailed issues breakdown
+            if (report.results && report.results.length > 0) {
+              comment += `\n### 🚨 Detailed Issues\n\n`;
+              
+              // Group issues by file
+              const fileGroups = {};
+              for (const result of report.results) {
+                if (result.issues && result.issues.length > 0) {
+                  fileGroups[result.filepath] = result.issues;
+                }
+              }
+              
+              for (const [filepath, issues] of Object.entries(fileGroups)) {
+                comment += `#### 📁 \`${filepath}\`\n`;
+                
+                // Sort by severity (critical first)
+                const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+                issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+                
+                for (const issue of issues) { // Show ALL issues, no limit
+                  const emoji = issue.severity === 'critical' ? '🔴' : issue.severity === 'high' ? '🟠' : issue.severity === 'medium' ? '🟡' : '🟢';
+                  comment += `${emoji} **Line ${issue.line}** (${issue.severity.toUpperCase()}): ${issue.description}\n`;
+                  
+                  if (issue.compliance_violations && issue.compliance_violations.length > 0) {
+                    comment += `   📋 *Violates: ${issue.compliance_violations.join(', ')}*\n`;
+                  }
+                  
+                  if (issue.rfc_document) {
+                    comment += `   📄 *RFC Document: ${issue.rfc_document}*\n`;
+                  }
+                  
+                  if (issue.s3_sources && issue.s3_sources.length > 0) {
+                    comment += `   🗂️ *S3 Sources: ${issue.s3_sources.join(', ')}*\n`;
+                  }
+                  
+                  if (issue.kb_rule) {
+                    comment += `   📚 *KB Rule: ${issue.kb_rule}*\n`;
+                  }
+                  
+                  if (issue.rule_source) {
+                    comment += `   🔗 *Source: ${issue.rule_source}*\n`;
+                  }
+                  
+                  if (issue.remediation) {
+                    comment += `   🔧 *Fix: ${issue.remediation}*\n`;
+                  }
+                  comment += `\n`;
+                }
                 comment += `\n`;
               }
             }
             
-            // Detailed findings by file - match original format
-            if (report.results && report.results.length > 0) {
-              let hasAnyIssues = false;
-              
-              // Check if any file has issues
-              for (const result of report.results) {
-                if (result.issues && result.issues.length > 0) {
-                  hasAnyIssues = true;
-                  break;
-                }
-              }
-              
-              if (hasAnyIssues) {
-                comment += `\n### 🔍 Detailed Findings\n\n`;
-                
-                for (const result of report.results) {
-                  if (result.issues && result.issues.length > 0) {
-                    comment += `#### 📁 \`${result.filepath}\` (${result.language})\n\n`;
-                    
-                    // Sort issues by severity
-                    const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
-                    result.issues.sort((a, b) => (severityOrder[a.severity] || 99) - (severityOrder[b.severity] || 99));
-                    
-                    for (const issue of result.issues) {
-                      const severity = issue.severity.toUpperCase();
-                      const emoji = severity === 'CRITICAL' ? '🔴' : severity === 'HIGH' ? '🟠' : severity === 'MEDIUM' ? '🟡' : '🟢';
-                      
-                      comment += `${emoji} Line ${issue.line} (${severity}): ${issue.description}\n`;
-                      
-                      if (issue.compliance_violations && issue.compliance_violations.length > 0) {
-                        comment += `📋 Violates: ${issue.compliance_violations.join(', ')}\n`;
-                      }
-                      
-                      if (issue.rfc_document) {
-                        comment += `📄 RFC Document: ${issue.rfc_document}\n`;
-                      }
-                      
-                      if (issue.s3_sources && issue.s3_sources.length > 0) {
-                        comment += `🗂️ S3 Sources: ${issue.s3_sources.join(', ')}\n`;
-                      }
-                      
-                      if (issue.kb_rule) {
-                        comment += `📚 KB Rule: ${issue.kb_rule}\n`;
-                      }
-                      
-                      if (issue.rule_source) {
-                        comment += `🔗 Source: ${issue.rule_source}\n`;
-                      }
-                      
-                      if (issue.remediation) {
-                        comment += `🔧 Fix: ${issue.remediation}\n`;
-                      }
-                      
-                      comment += `\n`;
-                    }
-                  }
-                }
-              }
-            }
-            
-            // Action required section
-            const criticalCount = (report.by_severity.critical || 0) + (report.by_severity.CRITICAL || 0);
-            const vulnCritical = report.vulnerability_summary?.critical_vulns || 0;
-            
-            comment += `\n### 🚨 Action Required\n`;
-            if (criticalCount > 0 || vulnCritical > 0) {
-              comment += `❌ **PR BLOCKED** - ${criticalCount + vulnCritical} critical issues must be resolved\n\n`;
-              comment += `**Steps to resolve:**\n`;
-              comment += `1. Review all critical issues listed above\n`;
-              comment += `2. Apply suggested fixes or update dependencies\n`;
+            if (report.by_severity.critical > 0) {
+              comment += `### ❌ Critical Issues Found\n`;
+              comment += `**${report.by_severity.critical} critical** security issues must be fixed before merging.\n\n`;
+              comment += `**Action Required:**\n`;
+              comment += `1. Review the critical issues listed above\n`;
+              comment += `2. Apply the suggested fixes\n`;
               comment += `3. Re-run the scan to verify fixes\n`;
-              comment += `4. Ensure no new critical issues are introduced\n`;
-            } else {
-              comment += `✅ **No critical issues** - PR can be merged\n\n`;
-              if (report.total_issues > 0) {
-                comment += `**Recommendations:**\n`;
-                comment += `1. Review and address high/medium severity findings\n`;
-                comment += `2. Consider fixing before production deployment\n`;
-              }
             }
-            
           } else {
-            comment += `❌ **Scan failed** - No compliance report generated\n`;
-            comment += `Check the workflow logs for details.\n`;
+            comment += `Scan completed but no detailed report available.\n`;
           }
           
-          // Post the comment
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,

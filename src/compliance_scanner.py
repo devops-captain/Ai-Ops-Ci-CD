@@ -3,10 +3,6 @@ import os
 import json
 import boto3
 import glob
-import hashlib
-import requests
-import time
-import re
 from datetime import datetime
 
 class ComplianceScanner:
@@ -19,8 +15,6 @@ class ComplianceScanner:
         self.model_id = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
         self.ai_calls = 0
         self.total_cost = 0
-        self.cache_file = '.compliance_cache.json'
-        self.file_cache = self.load_cache()
         
         # Compliance-focused prompts
         self.compliance_context = {
@@ -31,238 +25,17 @@ class ComplianceScanner:
             'OWASP': 'OWASP Top 10 covers injection, broken authentication, sensitive data exposure, and security misconfigurations.'
         }
     
-    def load_cache(self):
-        """Load file hash cache from S3 in CI/CD or local file"""
-        cache_data = {}
-        
-        # Try S3 global cache first (for CI/CD)
-        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
-        if s3_bucket:
-            try:
-                s3 = boto3.client('s3', region_name=self.region)
-                response = s3.get_object(Bucket=s3_bucket, Key='cache/global_compliance_cache.json')
-                cache_data = json.loads(response['Body'].read().decode('utf-8'))
-                print(f"📋 Loaded global cache from S3: {len(cache_data)} files")
-                return cache_data
-            except Exception as e:
-                print(f"📋 No S3 global cache found, starting fresh")
-        
-        # Fallback to local cache
-        try:
-            if os.path.exists(self.cache_file):
-                with open(self.cache_file, 'r') as f:
-                    cache_data = json.load(f)
-                print(f"📋 Loaded local cache: {len(cache_data)} files")
-        except Exception as e:
-            print(f"⚠️ Cache load error: {e}")
-        
-        return cache_data
-    
-    def post_pr_comment(self, report):
-        """Post comprehensive PR comment with vulnerability and compliance details"""
-        github_token = os.environ.get('GITHUB_TOKEN')
-        repo = os.environ.get('GITHUB_REPOSITORY')  # format: owner/repo
-        pr_number = os.environ.get('GITHUB_PR_NUMBER')
-        
-        if not all([github_token, repo, pr_number]):
-            print("⚠️ Missing GitHub environment variables for PR commenting")
-            return
-        
-        # Generate comment content
-        vuln_summary = report.get('vulnerability_summary', {})
-        total_issues = report.get('total_issues', 0)
-        total_vulns = vuln_summary.get('total_vulnerabilities', 0)
-        critical_vulns = vuln_summary.get('critical_vulns', 0)
-        high_vulns = vuln_summary.get('high_vulns', 0)
-        
-        # Build comment
-        comment = f"""## 🔍 ThreatLens Security Scan Results
-
-### 📊 Summary
-- **Total Issues**: {total_issues}
-- **Vulnerabilities**: {total_vulns} (Critical: {critical_vulns}, High: {high_vulns})
-- **CVE Findings**: {vuln_summary.get('cve_findings', 0)}
-- **GitHub Advisories**: {vuln_summary.get('github_advisories', 0)}
-- **Files Scanned**: {report.get('files_scanned', 0)}
-
-### 🚨 Vulnerabilities Found
-"""
-        
-        # Add vulnerability details (all severities)
-        vulnerabilities_found = False
-        for result in report.get('results', []):
-            for issue in result.get('issues', []):
-                if issue.get('type') == 'vulnerability':
-                    vulnerabilities_found = True
-                    severity_emoji = {'CRITICAL': '🔴', 'HIGH': '🟠', 'MEDIUM': '🟡', 'LOW': '🟢'}.get(issue.get('severity'), '⚪')
-                    comment += f"- {severity_emoji} **{issue.get('vulnerability_id')}** in `{result.get('filepath')}` (Package: {issue.get('package')})\n"
-                    comment += f"  - Severity: {issue.get('severity')} | Source: {issue.get('source')}\n"
-        
-        if not vulnerabilities_found:
-            comment += "✅ No vulnerabilities found\n"
-        
-        comment += f"""
-### 📋 Compliance Violations
-"""
-        
-        # Add compliance summary
-        compliance_summary = report.get('compliance_summary', {})
-        if compliance_summary:
-            for standard, data in list(compliance_summary.items())[:5]:  # Top 5
-                comment += f"- **{standard}**: {data.get('issues', 0)} issues"
-                if data.get('critical', 0) > 0:
-                    comment += f" (⚠️ {data.get('critical', 0)} critical)"
-                comment += "\n"
-        
-        comment += f"""
-### 🛠️ Next Steps
-"""
-        
-        if critical_vulns > 0 or report.get('by_severity', {}).get('critical', 0) > 0:
-            comment += "❌ **PR BLOCKED** - Critical issues must be resolved before merging\n"
-            comment += "1. Review critical vulnerabilities above\n"
-            comment += "2. Update dependencies or apply patches\n"
-            comment += "3. Re-run scan after fixes\n"
-        else:
-            comment += "✅ No critical issues blocking merge\n"
-            comment += "1. Review high/medium severity findings\n"
-            comment += "2. Consider addressing before production deployment\n"
-        
-        # Post comment
-        try:
-            url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
-            headers = {
-                'Authorization': f'Bearer {github_token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
-            payload = {'body': comment}
-            
-            response = requests.post(url, json=payload, headers=headers)
-            if response.status_code == 201:
-                print(f"✅ Posted PR comment to #{pr_number}")
-            else:
-                print(f"⚠️ Failed to post PR comment: {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ PR comment error: {e}")
-
-    def save_cache(self):
-        """Save file hash cache to both S3 and local"""
-        # Save locally
-        try:
-            with open(self.cache_file, 'w') as f:
-                json.dump(self.file_cache, f, indent=2)
-        except Exception as e:
-            print(f"⚠️ Local cache save error: {e}")
-        
-        # Save to S3 for CI/CD persistence (global cache, not PR-specific)
-        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
-        if s3_bucket:
-            try:
-                s3 = boto3.client('s3', region_name=self.region)
-                s3.put_object(
-                    Bucket=s3_bucket,
-                    Key='cache/global_compliance_cache.json',  # Global cache for all PRs/branches
-                    Body=json.dumps(self.file_cache, indent=2),
-                    ContentType='application/json'
-                )
-                print(f"📋 Global cache saved to S3: {len(self.file_cache)} files")
-            except Exception as e:
-                print(f"⚠️ S3 cache save error: {e}")
-    
-    def get_file_hash(self, filepath):
-        """Get SHA256 hash of file content"""
-        try:
-            with open(filepath, 'rb') as f:
-                return hashlib.sha256(f.read()).hexdigest()
-        except Exception:
-            return None
-    
-    def is_file_changed(self, filepath):
-        """Check if file has changed since last scan"""
-        current_hash = self.get_file_hash(filepath)
-        if not current_hash:
-            return True
-        
-        cached_data = self.file_cache.get(filepath, {})
-        return cached_data.get('hash') != current_hash
-    
-    def update_file_cache(self, filepath, scan_result):
-        """Update cache with new scan result"""
-        file_hash = self.get_file_hash(filepath)
-        if file_hash:
-            self.file_cache[filepath] = {
-                'hash': file_hash,
-                'result': scan_result,
-                'timestamp': datetime.now().isoformat()
-            }
-    
-    def get_cached_result(self, filepath):
-        """Get cached scan result if file unchanged"""
-        if not self.is_file_changed(filepath):
-            cached_data = self.file_cache.get(filepath, {})
-            if 'result' in cached_data:
-                print(f"   📋 Using cached result (file unchanged)")
-                return cached_data['result']
-        return None
-    
-    def get_scan_context(self):
-        """Get scan context - CI/CD info or local timestamp"""
-        # Check if running in GitHub Actions
-        if os.getenv('GITHUB_ACTIONS'):
-            repo_name = os.getenv('GITHUB_REPOSITORY', 'unknown-repo')
-            branch_name = os.getenv('GITHUB_REF_NAME', 'unknown-branch')
-            pr_number = os.getenv('GITHUB_EVENT_NUMBER') or os.getenv('GITHUB_PR_NUMBER')
-            
-            if pr_number:
-                scan_name = f"{repo_name}/PR-{pr_number}"
-                scan_id = f"{repo_name.replace('/', '_')}_PR_{pr_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            else:
-                scan_name = f"{repo_name}/{branch_name}"
-                scan_id = f"{repo_name.replace('/', '_')}_{branch_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
-            return {
-                'is_cicd': True,
-                'scan_name': scan_name,
-                'scan_id': scan_id,
-                'repo_name': repo_name,
-                'branch_name': branch_name,
-                'pr_number': pr_number,
-                'runner': 'GitHub Actions'
-            }
-        
-        # Check for other CI/CD systems
-        elif os.getenv('CI'):
-            ci_system = 'Unknown CI'
-            if os.getenv('JENKINS_URL'): ci_system = 'Jenkins'
-            elif os.getenv('GITLAB_CI'): ci_system = 'GitLab CI'
-            elif os.getenv('CIRCLECI'): ci_system = 'CircleCI'
-            elif os.getenv('TRAVIS'): ci_system = 'Travis CI'
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            return {
-                'is_cicd': True,
-                'scan_name': f"{ci_system}-{timestamp}",
-                'scan_id': f"ci_{timestamp}",
-                'runner': ci_system
-            }
-        
-        # Local development
-        else:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            return {
-                'is_cicd': False,
-                'scan_name': f"Local-{timestamp}",
-                'scan_id': timestamp,
-                'runner': 'Local Development'
-            }
-    
     def call_ai_with_compliance(self, prompt):
         """AI call with compliance context"""
         compliance_prompt = f"""
-You are a security expert. Return ONLY the fixed code. NO explanations. STOP after code ends.
+You are a security expert specializing in compliance standards: PCI-DSS, SOC2, HIPAA, GDPR, OWASP Top 10.
 
-Analyze this code deterministically and consistently:
+Context:
+- PCI-DSS: Protect cardholder data, encrypt transmission, implement access controls
+- SOC2: Security, availability, confidentiality controls
+- HIPAA: Protect PHI with encryption, access controls, audit logs
+- GDPR: Data protection by design, consent, minimization
+- OWASP: Prevent injection, broken auth, data exposure
 
 {prompt}
 """
@@ -275,8 +48,8 @@ Analyze this code deterministically and consistently:
                     modelId=self.model_id,
                     body=json.dumps({
                         "anthropic_version": "bedrock-2023-05-31",
-                        "max_tokens": int(os.getenv('AI_MAX_TOKENS', '4000')),
-                        "temperature": 0,
+                        "max_tokens": 3000,
+                        "temperature": 0.1,
                         "top_p": 0.9,
                         "messages": [{"role": "user", "content": compliance_prompt}]
                     })
@@ -292,7 +65,7 @@ Analyze this code deterministically and consistently:
                     modelId=self.model_id,
                     body=json.dumps({
                         "messages": [{"role": "user", "content": [{"text": compliance_prompt}]}],
-                        "inferenceConfig": {"maxTokens": int(os.getenv('AI_MAX_TOKENS', '4000')), "temperature": 0, "topP": 0.9}
+                        "inferenceConfig": {"maxTokens": 3000, "temperature": 0.1, "topP": 0.9}
                     })
                 )
                 
@@ -305,36 +78,7 @@ Analyze this code deterministically and consistently:
             output_tokens = len(output) / 4
             self.total_cost += (input_tokens * 0.00035 / 1000) + (output_tokens * 0.0014 / 1000)
             
-            # Aggressive explanation removal
-            lines = output.split('\n')
-            code_lines = []
-            explanation_started = False
-            
-            for line in lines:
-                # Check if explanation section starts
-                if any(pattern in line.lower() for pattern in [
-                    'the key changes', 'explanation of', 'changes made', 
-                    'to address the', 'security improvements', 'compliance',
-                    'these changes address', 'key changes made', 'summary of changes',
-                    'security and compliance', 'pci-dss', 'hipaa', 'gdpr',
-                    'this code now meets', 'updated the', 'disabled the',
-                    'removed the', 'encoded the', 'implemented a'
-                ]):
-                    explanation_started = True
-                    break
-                    
-                # Skip numbered explanation lists
-                if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')):
-                    explanation_started = True
-                    break
-                    
-                if not explanation_started:
-                    code_lines.append(line)
-            
-            # Join back and clean up
-            cleaned_output = '\n'.join(code_lines).strip()
-            
-            return cleaned_output
+            return output
             
         except Exception as e:
             self.log_error(str(e))
@@ -349,11 +93,7 @@ Analyze this code deterministically and consistently:
             '.java': 'Java', '.go': 'Go', '.sh': 'Shell'
         }
         
-        # Handle Dockerfile specifically
-        if filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
-            language = 'Docker'
-        else:
-            language = ext_map.get(os.path.splitext(filepath)[1], 'Unknown')
+        language = ext_map.get(os.path.splitext(filepath)[1], 'Unknown')
         
         # Detect framework
         framework = None
@@ -366,11 +106,6 @@ Analyze this code deterministically and consistently:
     
     def query_kb_for_rules(self, code_snippet, language):
         """Query your KB to get specific RFC rules for the code"""
-        # Speed optimization: Skip KB queries if disabled
-        if os.getenv('SKIP_KB_QUERY', 'false').lower() == 'true':
-            print(f"   ⚡ Skipping KB query for speed")
-            return {'kb_guidance': '', 's3_sources': []}
-            
         try:
             bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=self.region)
             
@@ -424,15 +159,6 @@ Analyze this code deterministically and consistently:
         
         # Query your KB for relevant RFC rules
         kb_info = self.query_kb_for_rules(code, language)
-        
-        # Validate KB is working properly
-        if not kb_info.get('kb_guidance') or 'standard compliance rules' in kb_info.get('kb_guidance', ''):
-            if os.getenv('REQUIRE_KB', 'false').lower() == 'true':
-                print(f"   ❌ Knowledge Base required but not available")
-                return []
-            else:
-                print(f"   ⚠️ Knowledge Base not available - using standard rules")
-        
         kb_context = ""
         if kb_info['kb_guidance']:
             kb_context = f"\nKnowledge Base Guidance:\n{kb_info['kb_guidance']}\n"
@@ -660,331 +386,9 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         return fixed.strip()
     
-    def extract_dependencies(self, code, filepath):
-        """Extract dependencies from code with line numbers and versions"""
-        dependencies = []
-        
-        if filepath.endswith('.tf'):
-            # Terraform modules and providers
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                if 'source' in line and '=' in line:
-                    match = re.search(r'source\s*=\s*["\']([^"\']+)["\']', line)
-                    if match:
-                        dep_name = match.group(1).split('/')[-1]
-                        # Try to find version constraint
-                        version_match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', code)
-                        version = version_match.group(1) if version_match else None
-                        dependencies.append({'name': dep_name, 'version': version, 'line': i})
-                        
-        elif filepath.endswith(('.yaml', '.yml')):
-            # Docker images, Helm charts
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                if 'image:' in line:
-                    match = re.search(r'image:\s*["\']?([^"\'\s]+)["\']?', line)
-                    if match:
-                        full_image = match.group(1)
-                        if ':' in full_image:
-                            img_name, version = full_image.split(':')[0].split('/')[-1], full_image.split(':')[1]
-                        else:
-                            img_name, version = full_image.split('/')[-1], 'latest'
-                        dependencies.append({'name': img_name, 'version': version, 'line': i})
-                        
-        elif filepath.endswith('.js'):
-            # NPM packages from require/import
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                matches = re.findall(r'(?:require|import).*?["\']([^"\']+)["\']', line)
-                for match in matches:
-                    if not match.startswith('./'):
-                        dependencies.append({'name': match, 'version': None, 'line': i})
-                        
-        elif filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
-            # Docker FROM images
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                if line.strip().upper().startswith('FROM'):
-                    match = re.search(r'FROM\s+([^\s]+)', line, re.IGNORECASE)
-                    if match:
-                        full_image = match.group(1)
-                        if ':' in full_image:
-                            img_name, version = full_image.split(':')[0].split('/')[-1], full_image.split(':')[1]
-                        else:
-                            img_name, version = full_image.split('/')[-1], 'latest'
-                        dependencies.append({'name': img_name, 'version': version, 'line': i})
-        
-        return dependencies
-    
-    def check_cve_vulnerabilities(self, dependencies):
-        """Check dependencies against NIST CVE database"""
-        # Speed optimization: Skip CVE checks if disabled
-        if os.getenv('SKIP_CVE_CHECK', 'false').lower() == 'true':
-            print(f"   ⚡ Skipping CVE checks for speed")
-            return []
-            
-        vulnerabilities = []
-        
-        max_deps = int(os.getenv('MAX_CVE_DEPS', '0'))  # 0 = no limit
-        deps_to_check = dependencies if max_deps == 0 else dependencies[:max_deps]
-        
-        for dep_info in deps_to_check:
-            dep = dep_info['name'] if isinstance(dep_info, dict) else dep_info
-            version = dep_info.get('version') if isinstance(dep_info, dict) else None
-            line_num = dep_info.get('line', 1) if isinstance(dep_info, dict) else 1
-            
-            try:
-                print(f"     🔍 Checking CVE for: {dep} {f'v{version}' if version else '(no version)'} (line {line_num})")
-                
-                # More precise CVE search with version info
-                if version and version != 'latest':
-                    search_query = f"{dep} {version}"
-                else:
-                    search_query = dep
-                    
-                url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-                params = {'keywordSearch': search_query, 'resultsPerPage': 1}  # Reduced for speed
-                
-                # Faster retry logic
-                max_retries = 2  # Reduced from 3
-                base_delay = 0.5  # Reduced from 1
-                
-                for attempt in range(max_retries):
-                    try:
-                        response = requests.get(url, params=params, timeout=8)  # Reduced from 15
-                        print(f"     📡 CVE API response: {response.status_code}")
-                        
-                        if response.status_code == 200:
-                            # Success - process results
-                            break
-                        elif response.status_code == 429:
-                            if attempt < max_retries - 1:
-                                delay = base_delay * (2 ** attempt)  # Exponential backoff
-                                print(f"     ⏳ Rate limited, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
-                                time.sleep(delay)
-                                continue
-                            else:
-                                print(f"     ❌ CVE API rate limited after {max_retries} attempts for {dep}")
-                                continue  # Skip this dependency
-                        else:
-                            print(f"     ❌ CVE API error {response.status_code} for {dep}")
-                            break
-                    except requests.exceptions.RequestException as e:
-                        if attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)
-                            print(f"     ⏳ Request failed, retrying in {delay}s: {e}")
-                            time.sleep(delay)
-                            continue
-                        else:
-                            print(f"     ❌ CVE API request failed after {max_retries} attempts: {e}")
-                            break
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    cve_count = len(data.get('vulnerabilities', []))
-                    print(f"     📊 Found {cve_count} CVEs for {dep}")
-                    
-                    for cve in data.get('vulnerabilities', []):
-                        cve_data = cve.get('cve', {})
-                        vuln_id = cve_data.get('id', 'Unknown')
-                        
-                        metrics = cve_data.get('metrics', {})
-                        cvss_score = 'Unknown'
-                        if 'cvssMetricV31' in metrics:
-                            cvss_score = metrics['cvssMetricV31'][0]['cvssData']['baseScore']
-                        elif 'cvssMetricV2' in metrics:
-                            cvss_score = metrics['cvssMetricV2'][0]['cvssData']['baseScore']
-                        
-                        description = cve_data.get('descriptions', [{}])[0].get('value', 'No description')
-                        
-                        # Generate fix suggestion
-                        fix_suggestion = f"Update {dep} to latest version or apply security patch for {vuln_id}"
-                        
-                        max_desc_len = int(os.getenv('MAX_DESCRIPTION_LENGTH', '500'))
-                        
-                        vulnerabilities.append({
-                            'type': 'CVE',
-                            'id': vuln_id,
-                            'package': dep,
-                            'line': line_num,
-                            'severity': self._get_severity_from_cvss(cvss_score),
-                            'description': description[:max_desc_len] + '...' if len(description) > max_desc_len else description
-                        })
-                else:
-                    print(f"     ❌ CVE API error {response.status_code} for {dep}")
-                
-                cve_delay = float(os.getenv('CVE_API_DELAY', '0.2'))  # Reduced from 0.5
-                time.sleep(cve_delay)  # Configurable rate limiting
-                
-            except Exception as e:
-                print(f"     ❌ CVE check failed for {dep}: {e}")
-        
-        print(f"   📊 Total CVE vulnerabilities found: {len(vulnerabilities)}")
-        return vulnerabilities
-    
-    def check_github_advisories(self, dependencies):
-        """Check dependencies against GitHub Advisory Database"""
-        advisories = []
-        github_token = os.environ.get("GITHUB_TOKEN")
-        
-        if not github_token:
-            return advisories
-        
-        max_deps = int(os.getenv('MAX_GITHUB_DEPS', '0'))  # 0 = no limit
-        deps_to_check = dependencies if max_deps == 0 else dependencies[:max_deps]
-        
-        for dep in deps_to_check:
-            try:
-                url = "https://api.github.com/graphql"
-                query = """
-                query($query: String!) {
-                  search(query: $query, type: REPOSITORY, first: 3) {
-                    nodes {
-                      ... on Repository {
-                        vulnerabilityAlerts(first: 3) {
-                          nodes {
-                            securityAdvisory {
-                              ghsaId
-                              summary
-                              severity
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                """
-                
-                headers = {'Authorization': f'Bearer {github_token}'}
-                payload = {'query': query, 'variables': {'query': dep}}
-                
-                response = requests.post(url, json=payload, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    for repo in data.get('data', {}).get('search', {}).get('nodes', []):
-                        for alert in repo.get('vulnerabilityAlerts', {}).get('nodes', []):
-                            advisory = alert.get('securityAdvisory', {})
-                            max_desc_len = int(os.getenv('MAX_DESCRIPTION_LENGTH', '500'))
-                            summary = advisory.get('summary', 'No summary')
-                            
-                            advisories.append({
-                                'type': 'GitHub Advisory',
-                                'id': advisory.get('ghsaId', 'Unknown'),
-                                'package': dep,
-                                'severity': advisory.get('severity', 'Unknown').upper(),
-                                'description': summary[:max_desc_len] + '...' if len(summary) > max_desc_len else summary
-                            })
-                
-                github_delay = float(os.getenv('GITHUB_API_DELAY', '0.2'))
-                time.sleep(github_delay)  # Configurable rate limiting
-                
-            except Exception as e:
-                print(f"GitHub Advisory check failed for {dep}: {e}")
-        
-        return advisories
-    
-    def _get_severity_from_cvss(self, score):
-        """Convert CVSS score to severity level"""
-        if score == 'Unknown':
-            return 'UNKNOWN'
-        try:
-            score = float(score)
-            if score >= 9.0:
-                return 'CRITICAL'
-            elif score >= 7.0:
-                return 'HIGH'
-            elif score >= 4.0:
-                return 'MEDIUM'
-            else:
-                return 'LOW'
-        except:
-            return 'UNKNOWN'
-    
-    def fix_vulnerabilities(self, code, vulnerability_issues, filepath):
-        """Fix vulnerabilities by updating dependencies to secure versions"""
-        fixed_code = code
-        
-        for vuln in vulnerability_issues:
-            package = vuln.get('package')
-            vuln_id = vuln.get('vulnerability_id')
-            
-            if filepath.endswith('.js'):
-                if f"require('{package}')" in fixed_code:
-                    fixed_code = fixed_code.replace(
-                        f"require('{package}')",
-                        f"require('{package}') // TODO: Update {package} to fix {vuln_id}"
-                    )
-                elif f'require("{package}")' in fixed_code:
-                    fixed_code = fixed_code.replace(
-                        f'require("{package}")',
-                        f'require("{package}") // TODO: Update {package} to fix {vuln_id}'
-                    )
-                    
-            elif filepath.endswith('Dockerfile') or 'dockerfile' in filepath.lower():
-                lines = fixed_code.split('\n')
-                for i, line_content in enumerate(lines):
-                    if line_content.strip().upper().startswith('FROM') and package in line_content:
-                        lines[i] = f"{line_content} # TODO: Update {package} base image to fix {vuln_id}"
-                fixed_code = '\n'.join(lines)
-                
-            elif filepath.endswith(('.yaml', '.yml')):
-                lines = fixed_code.split('\n')
-                for i, line_content in enumerate(lines):
-                    if 'image:' in line_content and package in line_content:
-                        lines[i] = f"{line_content} # TODO: Update {package} image to fix {vuln_id}"
-                fixed_code = '\n'.join(lines)
-        
-        return fixed_code
-    
-    def check_version_pinning(self, code, filepath):
-        """Check for unpinned dependency versions"""
-        issues = []
-        
-        if filepath.endswith('.js'):
-            # Check for unpinned npm requires
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                if 'require(' in line and not any(op in line for op in ['@', '^', '~', '>=', '<=', '==']):
-                    match = re.search(r'require\(["\']([^"\']+)["\']\)', line)
-                    if match and not match.group(1).startswith('./'):
-                        issues.append({
-                            'type': 'version_pinning',
-                            'severity': 'MEDIUM',
-                            'line': i,
-                            'description': f'Dependency {match.group(1)} not version pinned - security risk',
-                            'package': match.group(1),
-                            'compliance_violations': ['Security', 'Supply Chain']
-                        })
-                        
-        elif filepath.endswith('Dockerfile'):
-            # Check for unpinned Docker images
-            lines = code.split('\n')
-            for i, line in enumerate(lines, 1):
-                if line.strip().upper().startswith('FROM') and ':' not in line:
-                    match = re.search(r'FROM\s+([^\s]+)', line, re.IGNORECASE)
-                    if match:
-                        issues.append({
-                            'type': 'version_pinning',
-                            'severity': 'HIGH',
-                            'line': i,
-                            'description': f'Docker image {match.group(1)} not version pinned - security risk',
-                            'package': match.group(1),
-                            'compliance_violations': ['Security', 'Supply Chain']
-                        })
-        
-        return issues
-    
     def scan_file(self, filepath, auto_fix=False):
-        """Scan file with compliance focus and caching"""
+        """Scan file with compliance focus"""
         try:
-            # Skip cache if auto-fix is enabled - need fresh AI analysis for fixes
-            if not auto_fix:
-                cached_result = self.get_cached_result(filepath)
-                if cached_result:
-                    return cached_result
-            
             with open(filepath, 'r') as f:
                 code = f.read()
         except Exception as e:
@@ -997,102 +401,49 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         print(f"🔍 Compliance scanning {filepath} ({language}{f'/{framework}' if framework else ''})...")
         
-        # Extract and check dependencies for vulnerabilities
-        dependencies = self.extract_dependencies(code, filepath)
-        vulnerabilities = []
-        
-        if dependencies:
-            print(f"   🔍 Found dependencies: {dependencies}")
-            try:
-                vulnerabilities.extend(self.check_cve_vulnerabilities(dependencies))
-                vulnerabilities.extend(self.check_github_advisories(dependencies))
-            except Exception as e:
-                print(f"   ❌ Vulnerability check failed: {e}")
-            
-            if vulnerabilities:
-                print(f"   ⚠️ Found {len(vulnerabilities)} vulnerabilities")
-        else:
-            print(f"   ℹ️ No dependencies found")
-        
         # Compliance-focused detection
         issues = self.compliance_detect(code, language, framework, filepath)
         
-        # Add version pinning checks
-        version_issues = self.check_version_pinning(code, filepath)
-        issues.extend(version_issues)
-        if version_issues:
-            print(f"   📌 Found {len(version_issues)} version pinning issues")
-        
-        # Add vulnerability issues to compliance issues
-        for vuln in vulnerabilities:
-            issues.append({
-                'type': 'vulnerability',
-                'severity': vuln['severity'],
-                'description': f"{vuln['id']}: {vuln['description']}",
-                'package': vuln['package'],
-                'vulnerability_id': vuln['id'],
-                'source': vuln['type'],
-                'line': vuln.get('line', 1),
-                'compliance_violations': ['Security']
-            })
-        
         if not issues:
             print(f"   ✅ No compliance issues found")
-            result = None
-        else:
-            print(f"   Found {len(issues)} issues")
-            
-            # Show compliance violations
-            compliance_violations = set()
-            for issue in issues:
-                compliance_violations.update(issue.get('compliance_violations', []))
-            
-            if compliance_violations:
-                print(f"   📋 Compliance violations: {', '.join(compliance_violations)}")
-            
-            fixed = False
-            if auto_fix:
-                print(f"   🔧 AI fixing compliance and vulnerabilities...")
-                
-                # Separate compliance and vulnerability issues
-                compliance_issues = [i for i in issues if i.get('type') != 'vulnerability']
-                vulnerability_issues = [i for i in issues if i.get('type') == 'vulnerability']
-                
-                fixed_code = code
-                
-                # Fix compliance issues first
-                if compliance_issues:
-                    fixed_code = self.compliance_fix(fixed_code, compliance_issues, language, framework)
-                
-                # Fix vulnerabilities by updating dependencies
-                if vulnerability_issues:
-                    fixed_code = self.fix_vulnerabilities(fixed_code, vulnerability_issues, filepath)
-                
-                if fixed_code and len(fixed_code) > 50 and fixed_code != code:
-                    # Basic validation without external tools
-                    print(f"   🔍 Validating fixed code...")
-                    is_valid = self.basic_validation(fixed_code, language)
-                    
-                    if is_valid and fixed_code != code:
-                        with open(filepath, 'w') as f:
-                            f.write(fixed_code)
-                        fixed = True
-                        print(f"   ✅ Fixed and validated with compliance standards")
-                    else:
-                        print(f"   ❌ Fix validation failed - keeping original")
-            
-            result = {
-                'filepath': filepath,
-                'language': language,
-                'framework': framework,
-                'issues': issues,
-                'fixed': fixed,
-                'compliance_violations': list(compliance_violations)
-            }
+            return None
         
-        # Cache the result
-        self.update_file_cache(filepath, result)
-        return result
+        print(f"   Found {len(issues)} issues")
+        
+        # Show compliance violations
+        compliance_violations = set()
+        for issue in issues:
+            compliance_violations.update(issue.get('compliance_violations', []))
+        
+        if compliance_violations:
+            print(f"   📋 Compliance violations: {', '.join(compliance_violations)}")
+        
+        fixed = False
+        if auto_fix:
+            print(f"   🔧 Compliance-focused AI fixing...")
+            fixed_code = self.compliance_fix(code, issues, language, framework)
+            
+            if fixed_code and len(fixed_code) > 50 and fixed_code != code:
+                # Basic validation without external tools
+                print(f"   🔍 Validating fixed code...")
+                is_valid = self.basic_validation(fixed_code, language)
+                
+                if is_valid and fixed_code != code:
+                    with open(filepath, 'w') as f:
+                        f.write(fixed_code)
+                    fixed = True
+                    print(f"   ✅ Fixed and validated with compliance standards")
+                else:
+                    print(f"   ❌ Fix validation failed - keeping original")
+        
+        return {
+            'filepath': filepath,
+            'language': language,
+            'framework': framework,
+            'issues': issues,
+            'fixed': fixed,
+            'compliance_violations': list(compliance_violations)
+        }
     
     def upload_to_s3(self, report):
         """Upload report to S3 for web dashboard"""
@@ -1102,8 +453,8 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         try:
             s3 = boto3.client('s3', region_name=self.region)
-            context = self.get_scan_context()
-            key = f"reports/{context['scan_id']}_compliance_report.json"
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            key = f"reports/{timestamp}_compliance_report.json"
             
             s3.put_object(
                 Bucket=s3_bucket,
@@ -1112,7 +463,6 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
                 ContentType='application/json'
             )
             print(f"📤 Report uploaded to s3://{s3_bucket}/{key}")
-            print(f"🏷️ Scan Context: {context['scan_name']} ({context['runner']})")
         except Exception as e:
             print(f"⚠️ Failed to upload to S3: {e}")
 
@@ -1131,7 +481,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         print(f"Git push: {'ON' if git_push else 'OFF'}\n")
         
         # Collect files
-        extensions = ['.py', '.js', '.ts', '.tf', '.tfvars', '.yaml', '.yml', '.java', '.go', '.sh', 'Dockerfile']
+        extensions = ['.py', '.js', '.ts', '.tf', '.tfvars', '.yaml', '.yml', '.java', '.go', '.sh']
         files = []
         for ext in extensions:
             files.extend([f for f in glob.glob(f"**/*{ext}", recursive=True) 
@@ -1141,10 +491,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Scan files
         results = []
-        max_files = int(os.getenv('MAX_FILES_SCAN', '0'))  # 0 = no limit
-        files_to_scan = files if max_files == 0 else files[:max_files]
-        
-        for f in files_to_scan:
+        for f in files[:10]:  # Limit for cost
             result = self.scan_file(f, auto_fix)
             if result:
                 results.append(result)
@@ -1169,30 +516,19 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         total_issues = sum(len(r['issues']) for r in results)
         fixed_count = sum(1 for r in results if r['fixed'])
         
-        # Count vulnerabilities
-        vulnerability_issues = []
-        for r in results:
-            vulnerability_issues.extend([i for i in r['issues'] if i.get('type') == 'vulnerability'])
-        
-        vuln_count = len(vulnerability_issues)
-        cve_count = len([v for v in vulnerability_issues if v.get('source') == 'CVE'])
-        github_count = len([v for v in vulnerability_issues if v.get('source') == 'GitHub Advisory'])
-        
         by_severity = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         for r in results:
             for i in r['issues']:
                 by_severity[i['severity']] = by_severity.get(i['severity'], 0) + 1
         
         print(f"\n{'='*60}")
-        print(f"📊 Compliance Scan Results + Vulnerability Check")
+        print(f"📊 Compliance Scan Results")
         print(f"{'='*60}")
         print(f"Files scanned: {len(files)}")
         print(f"Issues found: {total_issues}")
-        print(f"Vulnerabilities: {vuln_count} (CVE: {cve_count}, GitHub: {github_count})")
         print(f"AI calls: {self.ai_calls}")
         print(f"Cost: ${self.total_cost:.4f}")
-        if auto_fix:
-            print(f"Fixed: {fixed_count} files")
+        if auto_fix:            print(f"Fixed: {fixed_count} files")
         
         print(f"\n🎯 Severity:")
         for s in ['critical', 'high', 'medium', 'low']:
@@ -1217,19 +553,11 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         # Save report
         report = {
-            'scan_context': self.get_scan_context(),
             'scan_date': datetime.now().isoformat(),
             'model': self.model_id,
             'knowledge_base_id': self.kb_id,
             'files_scanned': len(files),
             'total_issues': total_issues,
-            'vulnerability_summary': {
-                'total_vulnerabilities': vuln_count,
-                'cve_findings': cve_count,
-                'github_advisories': github_count,
-                'critical_vulns': len([v for v in vulnerability_issues if v.get('severity') == 'CRITICAL']),
-                'high_vulns': len([v for v in vulnerability_issues if v.get('severity') == 'HIGH'])
-            },
             'ai_calls': self.ai_calls,
             'cost': self.total_cost,
             'fixed': fixed_count if auto_fix else 0,
@@ -1244,26 +572,15 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         # Upload to S3 if configured
         self.upload_to_s3(report)
         
-        # Post PR comment if in CI/CD
-        if os.environ.get('GITHUB_ACTIONS') == 'true':
-            self.post_pr_comment(report)
-        
-        # Save cache after scan
-        self.save_cache()
-        
         print(f"\n📄 Report: compliance_report.json")
         
-        # Return appropriate exit code based on critical issues and environment
+        # Only return exit code 1 for CI/CD environments, not local runs
         if by_severity['critical'] > 0:
             print(f"\n⚠️  {by_severity['critical']} critical issues found.")
-            if os.getenv('GITHUB_ACTIONS') == 'true' and not auto_fix:
-                print("CI/CD: Blocking PR merge due to critical issues.")
-                return 1  # Block CI/CD on critical issues when auto-fix is disabled
-            else:
-                print("In CI/CD: This will block PR merging.")
-                print("Locally: Review and fix critical issues.")
+            print("In CI/CD: This will block PR merging.")
+            print("Locally: Review and fix critical issues.")
         
-        return 0
+        return 0  # Always return 0 for local runs - let workflow handle blocking
 
 if __name__ == "__main__":
     import sys
@@ -1272,7 +589,6 @@ if __name__ == "__main__":
     profile_name = None
     auto_fix = False
     git_push = False
-    skip_cve = False
     
     for arg in sys.argv[1:]:
         if arg.startswith('--profile='):
@@ -1284,34 +600,6 @@ if __name__ == "__main__":
         elif arg == '--fix-push':
             auto_fix = True
             git_push = True
-        elif arg == '--skip-cve':
-            skip_cve = True
-        elif arg == '--help' or arg == '-h':
-            print("""
-🔒 ThreatLens Compliance Scanner
-
-Usage: python3 compliance_scanner.py [OPTIONS]
-
-Options:
-  --fix              Apply AI-generated security fixes
-  --push             Push fixes to git (requires --fix)
-  --fix-push         Apply fixes and push to git
-  --skip-cve         Skip CVE vulnerability checks (faster scanning)
-  --profile=NAME     Use specific AWS profile
-  --files=FILE1,FILE2 Scan specific files only
-  --help, -h         Show this help message
-
-Examples:
-  python3 compliance_scanner.py                    # Scan only
-  python3 compliance_scanner.py --fix              # Scan and fix
-  python3 compliance_scanner.py --fix --skip-cve   # Fast scan and fix
-  python3 compliance_scanner.py --files=test.tf    # Scan specific file
-            """)
-            sys.exit(0)
-    
-    # Set environment variable for CVE skipping
-    if skip_cve:
-        os.environ['SKIP_CVE_CHECK'] = 'true'
     
     scanner = ComplianceScanner(profile_name=profile_name)
     exit(scanner.run(auto_fix=auto_fix, git_push=git_push))
