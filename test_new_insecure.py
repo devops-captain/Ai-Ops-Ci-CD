@@ -14,7 +14,8 @@ AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY')
 def execute_command(user_input):
     if not isinstance(user_input, str) or not user_input.isalnum():
         raise ValueError("Invalid input")
-    result = subprocess.run(["ls", user_input], capture_output=True)
+    query = "ls %s"
+    result = subprocess.run(query % user_input, shell=True, capture_output=True)
     return result.stdout
 
 def hash_password(password):
@@ -23,7 +24,8 @@ def hash_password(password):
 def get_user_by_id(user_id):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    query = "SELECT * FROM users WHERE id = ?"
+    cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
 def log_sensitive_data(credit_card, ssn):

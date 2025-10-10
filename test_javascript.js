@@ -36,8 +36,7 @@ function displayUserMessage(message) {
 
 function processFile(filename) {
     if (validator.matches(filename, /^[a-zA-Z0-9_-]+$/)) {
-        const command = `cat "${filename}"`;
-        exec(command, (error, stdout, stderr) => {
+        exec(`cat "${filename}"`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`exec error: ${error}`);
             } else {

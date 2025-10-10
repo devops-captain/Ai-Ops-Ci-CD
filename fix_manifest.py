@@ -7,7 +7,7 @@ from boto3.session import Session
 
 def fix_manifest():
     secrets_client = boto3.client('secretsmanager')
-    secret = secrets_client.get_secret_value(SecretId='s3-bucket-name')
+    secret = secrets_client.get_secret_value(SecretId='api-key')
     bucket = secret['SecretString']
 
     s3 = boto3.client('s3', region_name='us-east-1')

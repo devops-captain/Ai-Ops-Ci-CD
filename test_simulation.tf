@@ -1,6 +1,22 @@
 # S3 Bucket Security
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+  versioning {
+    enabled = true
+  }
+  public_access_block {
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+  }
 }
 
 # Security Group Rules
@@ -16,13 +32,9 @@ resource "aws_security_group" "secure" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["YOUR_IP/32"] # Restrict to specific IP
+    cidr_blocks = ["0.0.0.0/0"] # HTTPS only
   }
 }
-
-
-
-
 
 resource "aws_db_instance" "secure" {
   identifier              = "secure-db"
@@ -32,5 +44,19 @@ resource "aws_db_instance" "secure" {
   backup_retention_period = 7
   manage_master_user_password = true
   vpc_security_group_ids   = [aws_security_group.db.id]
-  password                = loloilllkjkjk
+  password                = aws_secretsmanager_secret_version.db_password.secret_string
+}
+
+resource "aws_secretsmanager_secret" "db_password" {
+  name = "db-password"
+}
+
+resource "aws_secretsmanager_secret_version" "db_password" {
+  secret_id     = aws_secretsmanager_secret.db_password.id
+  secret_string = random_password.db_password.result
+}
+
+resource "random_password" "db_password" {
+  length  = 16
+  special = true
 }

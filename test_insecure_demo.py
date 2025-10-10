@@ -18,7 +18,7 @@ AWS_SECRET_KEY = os.environ.get('AWS_SECRET_KEY')
 def get_user_data(user_id):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    query = "SELECT * FROM users WHERE id = ?"
+    query = "SELECT * FROM users WHERE id = %s"
     cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
@@ -51,7 +51,7 @@ def generate_session_token():
 
 def process_user_input(user_input):
     if isinstance(user_input, str) and user_input.strip():
-        exec(user_input)
+        logging.warning("Potential code injection vulnerability detected. Ignoring user input.")
     else:
         print("Invalid user input")
 
@@ -59,6 +59,7 @@ def create_sensitive_file():
     with open("/tmp/sensitive_data.txt", "w") as f:
         f.write(f"Secret: {JWT_SECRET}")
     os.chmod("/tmp/sensitive_data.txt", 0o600)
+    logging.info("Sensitive data file created with secure permissions.")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

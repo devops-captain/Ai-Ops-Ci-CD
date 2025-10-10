@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import secrets
 from boto3 import client
 
 API_KEY = os.environ.get('API_KEY')
@@ -21,11 +20,5 @@ def get_user_data(user_id):
     return cursor.fetchall()
 
 def process_payment(card_number, amount):
-    print(f"Processing payment for card: {card_number}")
-    log_file = open("/tmp/payments.log", "a")
-    log_file.write(f"Card: {card_number}, Amount: {amount}\n")
-    log_file.close()
-
-if __name__ == "__main__":
-    user_data = get_user_data("1")
-    process_payment("4111-1111-1111-1111-1111", 100.00)
+    print(f"Processing payment for card: {card_number[-4:]}")
+    # Do not log full card number

@@ -13,20 +13,28 @@ spec:
       labels:
         app: payment-api
     spec:
-      hostNetwork: false
-      hostPID: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
       containers:
       - name: api
         image: payment-api:latest
         securityContext:
-          runAsUser: 1000
-          runAsNonRoot: true
-          privileged: false
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
         resources:
           limits:
             memory: "2Gi"
             cpu: "1"
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
         env:
         - name: DB_PASSWORD
           valueFrom:
@@ -69,7 +77,7 @@ spec:
   - port: 80
     targetPort: 8080
     loadBalancerSourceRanges:
-    - 10.0.0.0/8
+    - 10.0.0.0/16
   selector:
     app: payment-api
 
@@ -83,13 +91,12 @@ spec:
   - name: debug
     image: busybox:1.35.0
     securityContext:
-      sysctls: []
-      volumeMounts: []
-  volumes:
-  - name: host-root
-    hostPath:
-      path: /non-sensitive-path
-      type: Directory
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -100,10 +107,18 @@ spec:
   podSelector: {}
   policyTypes:
   - Ingress
+  - Egress
   ingress:
   - from:
     - ipBlock:
-        cidr: 10.0.0.0/8
+        cidr: 10.0.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
     ports:
     - protocol: TCP
       port: 443
