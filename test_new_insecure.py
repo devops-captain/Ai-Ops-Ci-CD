@@ -15,7 +15,7 @@ def execute_command(user_input):
     if not isinstance(user_input, str) or not user_input.isalnum():
         raise ValueError("Invalid input")
     query = "ls %s"
-    result = subprocess.run(query % user_input, shell=True, capture_output=True)
+    result = subprocess.run(["ls", user_input], capture_output=True)
     return result.stdout
 
 def hash_password(password):
@@ -30,15 +30,18 @@ def get_user_by_id(user_id):
 
 def log_sensitive_data(credit_card, ssn):
     secrets_client = client('secretsmanager')
-    secrets_client.put_secret_value(
-        SecretId='sensitive-data',
+    secrets_client.create_secret(
+        Name='sensitive-data',
         SecretString=f"Credit Card: {credit_card}, SSN: {ssn}"
     )
 
 def unsafe_deserialization(data):
     if not isinstance(data, bytes):
         raise ValueError("Invalid input")
-    return pickle.loads(data)
+    try:
+        return pickle.loads(data)
+    except (pickle.UnpicklingError, AttributeError):
+        return None
 
 if __name__ == "__main__":
     user_cmd = input("Enter command: ")

@@ -21,4 +21,3 @@ def get_user_data(user_id):
 
 def process_payment(card_number, amount):
     print(f"Processing payment for card: {card_number[-4:]}")
-    # Do not log full card number

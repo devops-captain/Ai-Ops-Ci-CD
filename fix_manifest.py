@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import boto3
 import json
 import os
@@ -7,7 +6,7 @@ from boto3.session import Session
 
 def fix_manifest():
     secrets_client = boto3.client('secretsmanager')
-    secret = secrets_client.get_secret_value(SecretId='api-key')
+    secret = secrets_client.get_secret_value(SecretId=os.environ.get('BUCKET_SECRET_ID'))
     bucket = secret['SecretString']
 
     s3 = boto3.client('s3', region_name='us-east-1')

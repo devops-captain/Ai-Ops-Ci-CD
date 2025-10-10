@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# SECURE FILE - Compliance with security standards
-
 import os
 import sqlite3
 import requests
@@ -8,6 +5,8 @@ from boto3 import client
 from botocore.exceptions import ClientError
 import secrets
 import logging
+import random
+import string
 
 API_KEY = os.environ.get('API_KEY')
 DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
@@ -25,7 +24,8 @@ def get_user_data(user_id):
 def authenticate_user(username, password):
     if len(password) < 8 or not any(char.isupper() for char in password) or not any(char.isdigit() for char in password):
         return False
-    if username == "admin" and password == os.environ.get('ADMIN_PASSWORD'):
+    stored_password = os.environ.get('ADMIN_PASSWORD')
+    if username == "admin" and password == stored_password:
         return True
     return False
 
@@ -37,17 +37,20 @@ def read_file(filename):
     return None
 
 def send_sensitive_data(data):
+    secrets_client = client('secretsmanager')
+    api_key = secrets_client.get_secret_value(SecretId='api-key')['SecretString']
+    db_password = secrets_client.get_secret_value(SecretId='db-password')['SecretString']
     response = requests.post("https://api.example.com/sensitive", json={
-        "api_key": API_KEY,
+        "api_key": api_key,
         "user_data": data,
-        "password": DATABASE_PASSWORD
+        "password": db_password
     })
     return response.json()
 
 DEBUG = False
 
 def generate_session_token():
-    return secrets.token_hex(32)
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 def process_user_input(user_input):
     if isinstance(user_input, str) and user_input.strip():
