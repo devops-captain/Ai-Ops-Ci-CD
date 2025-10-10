@@ -50,10 +50,8 @@ jobs:
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           AUTO_FIX="${{ github.event.inputs.auto_fix }}"
-        elif [ "${{ github.event_name }}" = "schedule" ]; then
-          AUTO_FIX="true"   # Enable auto-fix for scheduled scans
         else
-          AUTO_FIX="false"  # No auto-fix for PR/push events
+          AUTO_FIX="true"  # Enable auto-fix for all events (PR, push, schedule)
         fi
         echo "auto_fix=$AUTO_FIX" >> $GITHUB_OUTPUT
         echo "Auto-fix enabled: $AUTO_FIX"
@@ -63,7 +61,7 @@ jobs:
         AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
         BEDROCK_KB_ID: ${{ vars.BEDROCK_KB_ID || 'RL3YC1HUKZ' }}
         BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}
-        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET }}
+        REPORTS_S3_BUCKET: ${{ vars.REPORTS_S3_BUCKET || 'ai-security-scanner-reports-1759503117' }}
       run: |
         SCAN_ARGS=""
         if [ "${{ steps.params.outputs.auto_fix }}" = "true" ]; then
@@ -74,9 +72,16 @@ jobs:
         echo "Using KB ID: $BEDROCK_KB_ID"
         echo "Using Model: $BEDROCK_MODEL_ID"
         if [ -n "$REPORTS_S3_BUCKET" ]; then
-          echo "Reports will be uploaded to: s3://$REPORTS_S3_BUCKET"
+          echo "Reports will be uploaded to: s3://$REPORTS_S3_BUCKET/reports/"
+          echo "Website URL: https://$REPORTS_S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
         fi
         python src/compliance_scanner.py $SCAN_ARGS
+        
+        # Log S3 upload results
+        if [ -n "$REPORTS_S3_BUCKET" ] && [ -f "compliance_report.json" ]; then
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          echo "Report uploaded to: s3://$REPORTS_S3_BUCKET/reports/compliance_report_$TIMESTAMP.json"
+        fi
     
     - name: Commit and push fixes
       if: steps.params.outputs.auto_fix == 'true'
