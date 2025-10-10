@@ -93,7 +93,7 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "🔧 Auto-fix security issues [skip ci]"
-          git push
+          git push origin HEAD:${{ github.ref_name }}
         fi
     
     - name: Generate PR Comment
