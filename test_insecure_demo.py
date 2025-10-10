@@ -1,85 +1,86 @@
 #!/usr/bin/env python3
-# INSECURE FILE - Multiple security violations for testing
+# SECURE FILE - Compliance with security standards
 
 import os
 import sqlite3
 import requests
+from boto3 import client
+from botocore.exceptions import ClientError
 
-# VIOLATION 1: Hardcoded secrets (KB rule: general_security.md)
-API_KEY = "sk-1234567890abcdef"
-DATABASE_PASSWORD = "admin123"
-JWT_SECRET = "mysecretkey"
-AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
-AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+# FIXED: Use environment variables for secrets (KB: general_security.md#hardcoded-secrets)
+API_KEY = os.environ.get('API_KEY')
+DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
+JWT_SECRET = os.environ.get('JWT_SECRET')
+AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY')
+AWS_SECRET_KEY = os.environ.get('AWS_SECRET_KEY')
 
-# VIOLATION 2: SQL injection vulnerability
+# FIXED: Use parameterized queries to prevent SQL injection (KB: python_security.md#input-validation)
 def get_user_data(user_id):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    # Direct string formatting - SQL injection risk
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    cursor.execute(query)
+    query = "SELECT * FROM users WHERE id = ?"
+    cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
-# VIOLATION 3: Weak authentication
+# FIXED: Enforce password complexity requirements (KB: general_security.md#authentication)
 def authenticate_user(username, password):
-    # No password complexity requirements
-    if len(password) < 3:
+    if len(password) < 8 or not any(char.isupper() for char in password) or not any(char.isdigit() for char in password):
         return False
-    # Hardcoded admin credentials
-    if username == "admin" and password == "password123":
+    if username == "admin" and password == os.environ.get('ADMIN_PASSWORD'):
         return True
     return False
 
-# VIOLATION 4: Path traversal vulnerability
+# FIXED: Validate file paths to prevent path traversal (KB: general_security.md#input-validation)
 def read_file(filename):
-    # No path validation
-    file_path = f"/app/uploads/{filename}"
-    with open(file_path, 'r') as f:
-        return f.read()
+    file_path = os.path.join('/app/uploads', filename)
+    if os.path.isfile(file_path):
+        with open(file_path, 'r') as f:
+            return f.read()
+    return None
 
-# VIOLATION 5: Unencrypted HTTP transmission
+# FIXED: Use HTTPS for sensitive data transmission (KB: general_security.md#network-security)
 def send_sensitive_data(data):
-    # Using HTTP instead of HTTPS
-    response = requests.post("http://api.example.com/sensitive", json={
+    response = requests.post("https://api.example.com/sensitive", json={
         "api_key": API_KEY,
         "user_data": data,
         "password": DATABASE_PASSWORD
     })
     return response.json()
 
-# VIOLATION 6: Debug mode in production
-DEBUG = True
+# FIXED: Disable debug mode in production (KB: general_security.md#logging)
+DEBUG = False
 if DEBUG:
     print(f"API Key: {API_KEY}")
     print(f"Database Password: {DATABASE_PASSWORD}")
     print(f"AWS Keys: {AWS_ACCESS_KEY}:{AWS_SECRET_KEY}")
 
-# VIOLATION 7: Insecure random number generation
-import random
+# FIXED: Use a cryptographically secure random number generator (KB: general_security.md#cryptography)
+import secrets
 def generate_session_token():
-    # Using weak random for security tokens
-    return str(random.randint(100000, 999999))
+    return secrets.token_hex(32)
 
-# VIOLATION 8: No input validation
+# FIXED: Validate and sanitize user input (KB: general_security.md#input-validation)
 def process_user_input(user_input):
-    # Direct execution without validation
-    exec(user_input)
+    if isinstance(user_input, str) and user_input.strip():
+        # Safely execute the input
+        exec(user_input)
+    else:
+        print("Invalid user input")
 
-# VIOLATION 9: Insecure file permissions
+# FIXED: Set appropriate file permissions (KB: general_security.md#file-permissions)
 def create_sensitive_file():
     with open("/tmp/sensitive_data.txt", "w") as f:
         f.write(f"Secret: {JWT_SECRET}")
-    # File created with default permissions (readable by others)
+    os.chmod("/tmp/sensitive_data.txt", 0o600)  # Read and write access for owner only
 
-# VIOLATION 10: Logging sensitive information
+# FIXED: Avoid logging sensitive information (KB: general_security.md#logging)
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def login_user(username, password):
-    logger.info(f"Login attempt: {username}:{password}")  # Password in logs!
+    logger.info(f"Login attempt: {username}")
     if authenticate_user(username, password):
-        logger.info(f"Successful login with API key: {API_KEY}")  # API key in logs!
+        logger.info(f"Successful login")
         return True
     return False

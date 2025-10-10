@@ -1,40 +1,51 @@
-#!/usr/bin/env python3
 import os
 import sqlite3
+import secrets
+import requests
+from boto3 import client
 
-# Hardcoded credentials - security violation
-API_KEY = "sk-1234567890abcdef"
-DATABASE_PASSWORD = "admin123"
-JWT_SECRET = "mysecretkey"
+# Secrets Management - Use environment variables or AWS Secrets Manager
+API_KEY = os.environ.get('API_KEY')
+if not API_KEY:
+    secrets_client = client('secretsmanager')
+    secret = secrets_client.get_secret_value(SecretId='api-key')
+    API_KEY = secret['SecretString']
+
+# Secrets Management - Use AWS Secrets Manager
+secrets_client = client('secretsmanager')
+secret = secrets_client.get_secret_value(SecretId='db-password')
+DATABASE_PASSWORD = secret['SecretString']
+
+# Secrets Management - Use environment variables or AWS Secrets Manager
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET:
+    JWT_SECRET = secrets.token_hex(32)
 
 def get_user_data(user_id):
-    # SQL injection vulnerability
+    # Input Validation - Parameterized queries to prevent SQL injection
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    cursor.execute(query)
+    query = "SELECT * FROM users WHERE id = ?"
+    cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
 def authenticate_user(username, password):
-    # Weak password validation
-    if len(password) < 4:
-        return False
-    return True
+    # No KB rules found for weak password validation
+    return len(password) >= 8 and any(char.isupper() for char in password)
 
 def upload_file(filename, content):
-    # Path traversal vulnerability
-    file_path = f"/uploads/{filename}"
+    # No KB rules found for path traversal vulnerability
+    file_path = os.path.join('/uploads', os.path.basename(filename))
     with open(file_path, 'w') as f:
         f.write(content)
 
 def send_data(data):
-    # Unencrypted HTTP transmission
-    import requests
-    response = requests.post("http://api.example.com/data", json=data)
+    # Network Security - Use HTTPS/TLS for data transmission
+    response = requests.post("https://api.example.com/data", json=data, headers={'Authorization': f'Bearer {JWT_SECRET}'})
     return response.json()
 
-# Debug mode enabled in production
-DEBUG = True
+# Debug mode disabled in production
+DEBUG = False
 if DEBUG:
     print(f"API Key: {API_KEY}")
     print(f"Database Password: {DATABASE_PASSWORD}")

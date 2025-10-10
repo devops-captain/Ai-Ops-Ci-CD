@@ -37,6 +37,20 @@ resource "aws_security_group" "secure" {
 }
 
 # Database Security
+resource "aws_secretsmanager_secret" "db_password" {
+  name = "db-password"
+}
+
+resource "aws_secretsmanager_secret_version" "db_password" {
+  secret_id     = aws_secretsmanager_secret.db_password.id
+  secret_string = random_password.db_password.result
+}
+
+resource "random_password" "db_password" {
+  length  = 16
+  special = true
+}
+
 resource "aws_db_instance" "secure" {
   identifier              = "secure-db"
   publicly_accessible     = false
@@ -45,13 +59,5 @@ resource "aws_db_instance" "secure" {
   backup_retention_period = 7
   manage_master_user_password = true
   vpc_security_group_ids   = [aws_security_group.db.id]
-  password                = data.aws_secretsmanager_secret_version.db_password.secret_string
-}
-
-data "aws_secretsmanager_secret_version" "db_password" {
-  secret_id = aws_secretsmanager_secret.db_password.id
-}
-
-resource "aws_secretsmanager_secret" "db_password" {
-  name = "db-password"
+  password                = aws_secretsmanager_secret_version.db_password.secret_string
 }

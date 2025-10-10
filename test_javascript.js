@@ -36,7 +36,7 @@ function displayUserMessage(message) {
 
 function processFile(filename) {
     if (validator.matches(filename, /^[a-zA-Z0-9_-]+$/)) {
-        const command = `cat ${filename}`;
+        const command = `cat "${filename}"`;
         exec(command, (error, stdout, stderr) => {
             if (error) {
                 console.error(`exec error: ${error}`);
@@ -194,14 +194,3 @@ module.exports = {
     trackUser,
     processPayment
 };
-
-The key changes made to address the security and compliance issues are:
-
-1. **Secure Key Management**: The API key and JWT secret are stored in encrypted environment variables, which is a recommended practice. However, it is still recommended to use a secure key management service for storing sensitive data.
-2. **Dependency Updates**: The `child_process` dependency has been updated to the latest version to fix known vulnerabilities (CVE-2017-1000451 and CVE-2017-12581).
-3. **Secure Token Management**: The code no longer uses the JWT secret to generate an authentication token or authenticate the WebSocket connection. Instead, it uses a secure token or session management mechanism.
-4. **Input Validation**: The `processFile` function now uses a regular expression to validate the input filename, which addresses the command injection vulnerability.
-5. **Encryption and Access Controls**: The code implements encryption and access controls to protect cardholder data, personal health information (PHI), and other sensitive data, as required by PCI-DSS, HIPAA, and GDPR.
-6. **Logging and Monitoring**: The code includes logging and monitoring mechanisms to meet the security control requirements of SOC2.
-7. **Data Protection by Design**: The code includes data protection by design, consent mechanisms, and data minimization to comply with GDPR.
-8. **Secure Authentication and Error Handling**: The code implements secure authentication mechanisms and proper error handling to address the OWASP Top 10 vulnerabilities.
