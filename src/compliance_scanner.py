@@ -3,6 +3,7 @@ import os
 import json
 import boto3
 import glob
+import hashlib
 from datetime import datetime
 
 class ComplianceScanner:
@@ -11,8 +12,14 @@ class ComplianceScanner:
         session = boto3.Session(profile_name=profile_name)
         self.region = os.getenv('AWS_REGION', 'us-east-1')
         self.bedrock = session.client('bedrock-runtime', region_name=self.region)
-        self.kb_id = os.getenv('BEDROCK_KB_ID', '6OFPQYR1JK')
+        self.kb_id = os.getenv('BEDROCK_KB_ID', 'RL3YC1HUKZ')
         self.model_id = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
+        self.ai_calls = 0
+        self.total_cost = 0
+        
+        # File hash cache
+        self.cache_file = '.file_hash_cache.json'
+        self.file_cache = self.load_cache()
         self.ai_calls = 0
         self.total_cost = 0
         
@@ -25,17 +32,252 @@ class ComplianceScanner:
             'OWASP': 'OWASP Top 10 covers injection, broken authentication, sensitive data exposure, and security misconfigurations.'
         }
     
+    def validate_knowledge_base(self):
+        """Validate Knowledge Base is accessible and contains compliance rules"""
+        try:
+            # Test KB with a simple compliance query
+            test_query = "security compliance standards PCI-DSS HIPAA"
+            kb_response = self.query_knowledge_base(test_query)
+            
+            if not kb_response or len(kb_response.strip()) < 50:
+                print(f"❌ KB validation failed: No meaningful response")
+                return False
+            
+            # Check for compliance keywords
+            compliance_keywords = ['PCI-DSS', 'HIPAA', 'GDPR', 'SOC2', 'OWASP', 'security', 'compliance']
+            found_keywords = sum(1 for keyword in compliance_keywords if keyword.lower() in kb_response.lower())
+            
+            if found_keywords < 2:
+                print(f"❌ KB validation failed: Insufficient compliance content")
+                return False
+            
+            print(f"✅ KB validation passed: Found {found_keywords} compliance keywords")
+            return True
+            
+        except Exception as e:
+            print(f"❌ KB validation failed: {e}")
+            return False
+    
+    def query_knowledge_base(self, query):
+        """Query Knowledge Base for compliance context with chunking for large files"""
+        try:
+            # AWS Bedrock KB hard limit: 20,000 chars (cannot be increased)
+            max_query_length = 18000  # Leave buffer for safety
+            
+            if len(query) <= max_query_length:
+                # Single query for normal-sized content
+                return self._single_kb_query(query)
+            else:
+                # Multiple queries for large files
+                print(f"   📄 Large file detected ({len(query)} chars) - using chunked KB queries")
+                return self._chunked_kb_query(query, max_query_length)
+                
+        except Exception as e:
+            print(f"   ❌ KB Query failed: {e}")
+            return None
+    
+    def _single_kb_query(self, query):
+        """Single KB query for normal-sized content"""
+        bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=self.region)
+        
+        response = bedrock_agent.retrieve(
+            knowledgeBaseId=self.kb_id,
+            retrievalQuery={'text': query},
+            retrievalConfiguration={
+                'vectorSearchConfiguration': {
+                    'numberOfResults': 5
+                }
+            }
+        )
+        
+        context = ""
+        for result in response['retrievalResults']:
+            context += f"{result['content']['text']}\n\n"
+        
+        if context.strip():
+            print(f"   📚 KB Query successful - {len(response['retrievalResults'])} sources found")
+            return context.strip()
+        return None
+    
+    def _chunked_kb_query(self, query, chunk_size):
+        """Multiple KB queries for large files"""
+        chunks = []
+        lines = query.split('\n')
+        current_chunk = ""
+        
+        # Split into chunks by lines to maintain context
+        for line in lines:
+            if len(current_chunk + line + '\n') > chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = line + '\n'
+            else:
+                current_chunk += line + '\n'
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        print(f"   📊 Processing {len(chunks)} chunks for comprehensive KB analysis")
+        
+        # Query each chunk and combine results
+        all_context = ""
+        total_sources = 0
+        
+        for i, chunk in enumerate(chunks[:3]):  # Limit to 3 chunks for cost control
+            chunk_context = self._single_kb_query(chunk)
+            if chunk_context:
+                all_context += f"--- Chunk {i+1} Context ---\n{chunk_context}\n\n"
+                total_sources += 1
+        
+        if all_context:
+            print(f"   📚 Chunked KB Query successful - {total_sources} chunks analyzed")
+            return all_context.strip()
+        
+        return None
+    
+    def get_file_hash(self, filepath):
+        """Generate SHA256 hash of file content"""
+        try:
+            with open(filepath, 'rb') as f:
+                return hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            return None
+    
+    def load_cache(self):
+        """Load file hash cache from local file or S3 (for CI/CD)"""
+        cache = {}
+        
+        # Try S3 first (for CI/CD)
+        if os.getenv('GITHUB_ACTIONS') == 'true' or os.getenv('CI') == 'true':
+            cache = self.load_cache_from_s3()
+            if cache:
+                print(f"📋 Loaded S3 cache: {len(cache)} files")
+                return cache
+        
+        # Fallback to local cache
+        try:
+            if os.path.exists(self.cache_file):
+                with open(self.cache_file, 'r') as f:
+                    cache = json.load(f)
+                    print(f"📋 Loaded local cache: {len(cache)} files")
+                    return cache
+        except Exception as e:
+            print(f"⚠️ Local cache load failed: {e}")
+        
+        return {}
+    
+    def save_cache(self):
+        """Save file hash cache to local file and S3 (for CI/CD)"""
+        # Save locally
+        try:
+            with open(self.cache_file, 'w') as f:
+                json.dump(self.file_cache, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Local cache save failed: {e}")
+        
+        # Save to S3 for CI/CD persistence
+        if os.getenv('GITHUB_ACTIONS') == 'true' or os.getenv('CI') == 'true':
+            self.save_cache_to_s3()
+    
+    def load_cache_from_s3(self):
+        """Load cache from S3"""
+        try:
+            s3_bucket = os.getenv('S3_CACHE_BUCKET', 'ai-security-scanner-cache')
+            cache_key = f"cache/{os.getenv('GITHUB_REPOSITORY', 'default')}/file_hash_cache.json"
+            
+            s3 = boto3.client('s3', region_name=self.region)
+            response = s3.get_object(Bucket=s3_bucket, Key=cache_key)
+            cache_data = json.loads(response['Body'].read())
+            
+            # Clean old cache entries (older than 7 days)
+            cutoff_date = datetime.now().timestamp() - (7 * 24 * 60 * 60)
+            cleaned_cache = {}
+            for filepath, data in cache_data.items():
+                try:
+                    cache_time = datetime.fromisoformat(data.get('timestamp', '1970-01-01')).timestamp()
+                    if cache_time > cutoff_date:
+                        cleaned_cache[filepath] = data
+                except:
+                    pass
+            
+            return cleaned_cache
+            
+        except Exception as e:
+            print(f"⚠️ S3 cache load failed: {e}")
+            return {}
+    
+    def save_cache_to_s3(self):
+        """Save cache to S3"""
+        try:
+            s3_bucket = os.getenv('S3_CACHE_BUCKET', 'ai-security-scanner-cache')
+            cache_key = f"cache/{os.getenv('GITHUB_REPOSITORY', 'default')}/file_hash_cache.json"
+            
+            s3 = boto3.client('s3', region_name=self.region)
+            s3.put_object(
+                Bucket=s3_bucket,
+                Key=cache_key,
+                Body=json.dumps(self.file_cache, indent=2),
+                ContentType='application/json'
+            )
+            print(f"📋 Saved cache to S3: s3://{s3_bucket}/{cache_key}")
+            
+        except Exception as e:
+            print(f"⚠️ S3 cache save failed: {e}")
+    
+    def get_cached_result(self, filepath):
+        """Get cached result if file hasn't changed"""
+        current_hash = self.get_file_hash(filepath)
+        if not current_hash:
+            return None
+        
+        cache_key = filepath
+        if cache_key in self.file_cache:
+            cached_data = self.file_cache[cache_key]
+            if cached_data.get('hash') == current_hash:
+                return cached_data.get('result')
+        
+        return None
+    
+    def cache_result(self, filepath, result):
+        """Cache scan result with file hash"""
+        file_hash = self.get_file_hash(filepath)
+        if file_hash:
+            self.file_cache[filepath] = {
+                'hash': file_hash,
+                'result': result,
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    
     def call_ai_with_compliance(self, prompt):
-        """AI call with compliance context"""
+        """AI call with MANDATORY Knowledge Base compliance context"""
+        
+        # ENFORCE: Knowledge Base must be available
+        if not self.kb_id:
+            raise Exception("❌ BLOCKED: Knowledge Base ID required. KB is the source of truth for compliance.")
+        
+        # Extract key terms for KB query (not the full prompt)
+        kb_query = self._extract_kb_query_terms(prompt)
+        
+        # MANDATORY: Query Knowledge Base with summary terms
+        kb_context = self.query_knowledge_base(kb_query)
+        if not kb_context:
+            raise Exception("❌ BLOCKED: Knowledge Base query failed. Cannot proceed without KB source of truth.")
+        
+        # Build prompt with KB context as only source
         compliance_prompt = f"""
-You are a security expert specializing in compliance standards: PCI-DSS, SOC2, HIPAA, GDPR, OWASP Top 10.
+You are a security expert. Use ONLY the Knowledge Base context provided below as the source of truth for compliance rules.
 
-Context:
-- PCI-DSS: Protect cardholder data, encrypt transmission, implement access controls
-- SOC2: Security, availability, confidentiality controls
-- HIPAA: Protect PHI with encryption, access controls, audit logs
-- GDPR: Data protection by design, consent, minimization
-- OWASP: Prevent injection, broken auth, data exposure
+KNOWLEDGE BASE CONTEXT (ONLY SOURCE):
+{kb_context}
+
+STRICT REQUIREMENTS:
+- Use ONLY the rules and standards from the Knowledge Base above
+- Do NOT use any hardcoded or memorized compliance rules
+- All compliance violations must reference KB sources
+- If KB doesn't contain relevant rules, report "No KB rules found"
+
+Analyze this code using ONLY KB context:
 
 {prompt}
 """
@@ -83,6 +325,28 @@ Context:
         except Exception as e:
             self.log_error(str(e))
             return None
+    
+    def _extract_kb_query_terms(self, prompt):
+        """Extract key terms for KB query instead of sending full prompt"""
+        # Extract language and key security terms from prompt
+        lines = prompt.split('\n')
+        
+        # Find language
+        language = "unknown"
+        for line in lines[:10]:
+            if 'Python' in line:
+                language = "Python"
+            elif 'JavaScript' in line:
+                language = "JavaScript"
+            elif 'Terraform' in line:
+                language = "Terraform"
+            elif 'Kubernetes' in line:
+                language = "Kubernetes"
+        
+        # Create focused KB query
+        kb_query = f"{language} security compliance standards hardcoded secrets SQL injection encryption access control"
+        
+        return kb_query
     
     def detect_language_and_framework(self, filepath, code):
         """Detect language and framework"""
@@ -232,26 +496,6 @@ Return ONLY the JSON array."""
         
         return []
     
-    def basic_validation(self, fixed_code, language):
-        """Basic validation without external tools"""
-        # Simple checks without external dependencies
-        if len(fixed_code.strip()) < 10:
-            return False
-            
-        if language == 'Python':
-            # Basic Python syntax check
-            try:
-                compile(fixed_code, '<string>', 'exec')
-                return True
-            except SyntaxError:
-                return False
-        
-        # For other languages, just check it's not empty and has content
-        return len(fixed_code.strip()) > 10
-        """Validate and format fixed code"""
-        import tempfile
-        import subprocess
-        import os
         
         # Save fixed code to temp file for validation
         with tempfile.NamedTemporaryFile(mode='w', suffix=os.path.splitext(filepath)[1], delete=False) as temp_file:
@@ -342,10 +586,6 @@ Return ONLY the JSON array."""
                 os.unlink(temp_path)
             except:
                 pass
-    
-    # def git_commit_and_push(self, files_fixed, branch_name=None):
-    #     """Commit and push fixed files to git - MOVED TO WORKFLOW"""
-    #     pass  # Git operations handled by GitHub Actions workflow
     
     def compliance_fix(self, code, issues, language, framework):
         """Generate compliance-focused fixes"""
@@ -447,7 +687,7 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
     
     def upload_to_s3(self, report):
         """Upload report to S3 for web dashboard"""
-        s3_bucket = os.getenv('REPORTS_S3_BUCKET')
+        s3_bucket = os.getenv('REPORTS_S3_BUCKET', 'ai-security-scanner-reports-1759503117')
         if not s3_bucket:
             return
         
@@ -456,29 +696,92 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             key = f"reports/{timestamp}_compliance_report.json"
             
+            # Upload report
             s3.put_object(
                 Bucket=s3_bucket,
                 Key=key,
                 Body=json.dumps(report, indent=2),
                 ContentType='application/json'
             )
+            
+            # Update manifest with latest 10 reports
+            self.update_reports_manifest(s3, s3_bucket, key)
+            
             print(f"📤 Report uploaded to s3://{s3_bucket}/{key}")
         except Exception as e:
             print(f"⚠️ Failed to upload to S3: {e}")
+    
+    def update_reports_manifest(self, s3, bucket, new_report_key):
+        """Update reports manifest to show latest 10 reports"""
+        try:
+            # List all reports from S3 (more reliable than manifest)
+            response = s3.list_objects_v2(Bucket=bucket, Prefix='reports/')
+            reports = []
+            
+            for obj in response.get('Contents', []):
+                if obj['Key'].endswith('.json'):
+                    reports.append({
+                        'key': obj['Key'],
+                        'timestamp': obj['LastModified']
+                    })
+            
+            # Sort by timestamp (newest first) and keep latest 10
+            reports.sort(key=lambda x: x['timestamp'], reverse=True)
+            latest_reports = [r['key'] for r in reports[:10]]
+            
+            # Update manifest
+            manifest = {"reports": latest_reports}
+            
+            s3.put_object(
+                Bucket=bucket,
+                Key='reports-manifest.json',
+                Body=json.dumps(manifest, indent=2),
+                ContentType='application/json'
+            )
+            
+            print(f"📋 Updated manifest with {len(latest_reports)} latest reports")
+            
+        except Exception as e:
+            print(f"⚠️ Failed to update manifest: {e}")
+    
+    def print_executive_summary(self, report):
+        """Print executive summary for leadership"""
+        print(f"\n📊 Executive Summary:")
+        print(f"   🔍 Security Posture: {'🔴 CRITICAL' if report['by_severity']['critical'] > 0 else '🟡 NEEDS ATTENTION' if report['by_severity']['high'] > 0 else '🟢 GOOD'}")
+        print(f"   📁 Code Coverage: {report['files_scanned']} files scanned")
+        print(f"   🎯 Risk Level: {report['by_severity']['critical']} critical, {report['by_severity']['high']} high priority issues")
+        print(f"   💰 Scan Efficiency: ${report['cost']:.4f} cost, {report['ai_calls']} AI calls")
+        
+        # Top compliance violations
+        top_violations = sorted(report['compliance_summary'].items(), key=lambda x: x[1]['issues'], reverse=True)[:3]
+        print(f"   📋 Top Compliance Gaps:")
+        for standard, data in top_violations:
+            print(f"      • {standard}: {data['issues']} issues across {len(set(data['files']))} files")
+        
+        # Cache efficiency
+        cache_efficiency = ((10 - report['ai_calls']) / 10) * 100 if report['files_scanned'] > 0 else 0
+        print(f"   ⚡ Cache Efficiency: {cache_efficiency:.0f}% (${(0.02 - report['cost']):.4f} saved)")
 
     def log_error(self, message):
         """Log errors securely"""
         with open('error_log.txt', 'a') as log_file:
             log_file.write(f"{datetime.now().isoformat()} - ERROR: {message}\n")
     
-    def run(self, auto_fix=False, git_push=False):
+    def run(self, auto_fix=False):
         """Main compliance scan"""
         print(f"🔒 Compliance-Focused AI Security Scanner")
         print(f"Model: {self.model_id}")
-        print(f"Knowledge Base ID: {self.kb_id} (configured for future use)")
-        print(f"Standards: PCI-DSS, SOC2, HIPAA, GDPR, OWASP")
-        print(f"Auto-fix: {'ON' if auto_fix else 'OFF'}")
-        print(f"Git push: {'ON' if git_push else 'OFF'}\n")
+        print(f"Knowledge Base ID: {self.kb_id}")
+        
+        # ENFORCE: Validate Knowledge Base is accessible
+        if not self.validate_knowledge_base():
+            print("❌ CRITICAL: Knowledge Base validation failed!")
+            print("❌ Scanner BLOCKED: KB is mandatory source of truth for compliance")
+            return 1
+        
+        print(f"✅ Knowledge Base validated - proceeding with KB as source of truth")
+        print(f"Standards: Determined by Knowledge Base content")
+        print(f"Auto-fix: {'ON' if auto_fix else 'OFF'}\n")
         
         # Collect files
         extensions = ['.py', '.js', '.ts', '.tf', '.tfvars', '.yaml', '.yml', '.java', '.go', '.sh']
@@ -492,9 +795,22 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         # Scan files
         results = []
         for f in files[:10]:  # Limit for cost
+            # Check cache first
+            cached_result = self.get_cached_result(f)
+            if cached_result:
+                print(f"📋 Using cached result for {f} (file unchanged)")
+                results.append(cached_result)
+                continue
+            
+            # Scan file if not cached
             result = self.scan_file(f, auto_fix)
             if result:
+                # Cache the result
+                self.cache_result(f, result)
                 results.append(result)
+        
+        # Save cache after scanning
+        self.save_cache()
         
         # Generate compliance report
         compliance_summary = {}
@@ -528,7 +844,8 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         print(f"Issues found: {total_issues}")
         print(f"AI calls: {self.ai_calls}")
         print(f"Cost: ${self.total_cost:.4f}")
-        if auto_fix:            print(f"Fixed: {fixed_count} files")
+        if auto_fix:
+            print(f"Fixed: {fixed_count} files")
         
         print(f"\n🎯 Severity:")
         for s in ['critical', 'high', 'medium', 'low']:
@@ -574,6 +891,9 @@ Return ONLY the complete fixed code that meets all compliance requirements:"""
         
         print(f"\n📄 Report: compliance_report.json")
         
+        # Generate executive summary
+        self.print_executive_summary(report)
+        
         # Only return exit code 1 for CI/CD environments, not local runs
         if by_severity['critical'] > 0:
             print(f"\n⚠️  {by_severity['critical']} critical issues found.")
@@ -588,18 +908,12 @@ if __name__ == "__main__":
     # Parse arguments
     profile_name = None
     auto_fix = False
-    git_push = False
     
     for arg in sys.argv[1:]:
         if arg.startswith('--profile='):
             profile_name = arg.split('=')[1]
         elif arg == '--fix':
             auto_fix = True
-        elif arg == '--push':
-            git_push = True
-        elif arg == '--fix-push':
-            auto_fix = True
-            git_push = True
     
     scanner = ComplianceScanner(profile_name=profile_name)
-    exit(scanner.run(auto_fix=auto_fix, git_push=git_push))
+    exit(scanner.run(auto_fix=auto_fix))
