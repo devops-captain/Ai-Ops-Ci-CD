@@ -3,14 +3,12 @@ import sqlite3
 import secrets
 from boto3 import client
 
-# Use environment variable or AWS Secrets Manager for API key
 API_KEY = os.environ.get('API_KEY')
 if not API_KEY:
     secrets_client = client('secretsmanager')
     secret = secrets_client.get_secret_value(SecretId='api-key')
     API_KEY = secret['SecretString']
 
-# Use AWS Secrets Manager for database password
 secrets_client = client('secretsmanager')
 secret = secrets_client.get_secret_value(SecretId='db-password')
 DB_PASSWORD = secret['SecretString']

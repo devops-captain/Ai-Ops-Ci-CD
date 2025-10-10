@@ -46,6 +46,3 @@ def send_data(data):
 
 # Debug mode disabled in production
 DEBUG = False
-if DEBUG:
-    print(f"API Key: {API_KEY}")
-    print(f"Database Password: {DATABASE_PASSWORD}")

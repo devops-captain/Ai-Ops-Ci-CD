@@ -1,45 +1,47 @@
-#!/usr/bin/env python3
-
 import os
 import subprocess
 import hashlib
+import sqlite3
+import pickle
+from boto3 import client
+from secrets import token_urlsafe
 
-# Hardcoded secrets
-SECRET_KEY = "super_secret_key_123"
-DATABASE_URL = "postgresql://admin:password123@localhost/mydb"
-AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+# Use environment variables for secrets
+SECRET_KEY = os.environ.get('SECRET_KEY')
+DATABASE_URL = os.environ.get('DATABASE_URL')
+AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY')
 
 def execute_command(user_input):
-    # Command injection vulnerability
-    result = subprocess.run(f"ls {user_input}", shell=True, capture_output=True)
+    if not isinstance(user_input, str) or not user_input.isalnum():
+        raise ValueError("Invalid input")
+    result = subprocess.run(["ls", user_input], capture_output=True)
     return result.stdout
 
 def hash_password(password):
-    # Weak hashing algorithm
-    return hashlib.md5(password.encode()).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def get_user_by_id(user_id):
-    # SQL injection vulnerability
-    import sqlite3
     conn = sqlite3.connect('users.db')
-    query = f"SELECT * FROM users WHERE id = '{user_id}'"
-    return conn.execute(query).fetchall()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    return cursor.fetchall()
 
 def log_sensitive_data(credit_card, ssn):
-    # Logging sensitive data in plain text
-    with open('/tmp/sensitive.log', 'a') as f:
-        f.write(f"Credit Card: {credit_card}, SSN: {ssn}\n")
+    secrets_client = client('secretsmanager')
+    secrets_client.put_secret_value(
+        SecretId='sensitive-data',
+        SecretString=f"Credit Card: {credit_card}, SSN: {ssn}"
+    )
 
 def unsafe_deserialization(data):
-    # Unsafe deserialization
-    import pickle
+    if not isinstance(data, bytes):
+        raise ValueError("Invalid input")
     return pickle.loads(data)
 
 if __name__ == "__main__":
-    # Insecure usage
     user_cmd = input("Enter command: ")
     execute_command(user_cmd)
     
-    weak_hash = hash_password("admin")
-    user_data = get_user_by_id("1' OR '1'='1")
+    strong_hash = hash_password("admin")
+    user_data = get_user_by_id("1")
     log_sensitive_data("4111-1111-1111-1111", "123-45-6789")
