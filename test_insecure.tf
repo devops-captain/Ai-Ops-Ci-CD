@@ -4,16 +4,6 @@ resource "aws_s3_bucket" "bad" {
 
   }
 
-  versioning {
-    enabled = true
-  }
-
-  public_access_block {
-    block_public_acls       = true
-    block_public_policy    = true
-    ignore_public_acls      = true
-    restrict_public_buckets = true
-  }
 }
 
 resource "aws_security_group" "bad" {
@@ -34,7 +24,4 @@ resource "aws_db_instance" "bad" {
   publicly_accessible  = false
   storage_encrypted    = true
 }
-
-data "aws_secretsmanager_secret_version" "db_password" {
-  secret_id = "db-password"
 }
