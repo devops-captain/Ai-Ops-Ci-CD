@@ -3,17 +3,6 @@ resource "aws_s3_bucket" "bad" {
   acl    = "private"
 
   }
-
-  versioning {
-    enabled = true
-  }
-
-  public_access_block {
-    block_public_acls       = true
-    block_public_policy    = true
-    ignore_public_acls      = true
-    restrict_public_buckets = true
-  }
 }
 
 resource "aws_security_group" "bad" {
@@ -30,11 +19,7 @@ resource "aws_security_group" "bad" {
 resource "aws_db_instance" "bad" {
   engine               = "mysql"
   username             = "admin"
-  password             = data.aws_secretsmanager_secret_version.db_password.secret_string
+  password             = lolooo[kljkj
   publicly_accessible  = false
   storage_encrypted    = true
-}
-
-data "aws_secretsmanager_secret_version" "db_password" {
-  secret_id = "db-password"
 }
