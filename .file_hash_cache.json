@@ -420,120 +420,36 @@
     "timestamp": "2025-10-10T17:46:07.730196"
   },
   "test_insecure.tf": {
-    "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",
+    "hash": "df3843c8e4f5d4b58c7a33ee14c0da33f9097ba3e9e503b3dff9c54f5bd4b08d",
     "result": {
       "filepath": "test_insecure.tf",
       "language": "Terraform",
       "framework": null,
       "issues": [
         {
-          "line": 2,
+          "line": 40,
           "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have server-side encryption enabled",
-          "cvss": 5.5,
+          "category": "Security Group",
+          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
+          "cvss": 5.3,
           "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
+            "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Enable server-side encryption for the S3 bucket using the `server_side_encryption_configuration` block",
-          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
+          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
+          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
+          "rfc_document": "terraform_security.md",
+          "rule_source": "Security Group Rules",
           "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 2,
-          "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have versioning enabled",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Enable versioning for the S3 bucket using the `versioning { enabled = true }` block",
-          "kb_rule": "S3 Bucket Security - Enable versioning: `versioning { enabled = true }`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 2,
-          "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have public access blocked",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Block public access to the S3 bucket using the `public_access_block` block",
-          "kb_rule": "S3 Bucket Security - Block public access: `block_public_acls = true`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 21,
-          "severity": "medium",
-          "category": "Security Group Rules",
-          "description": "Security group allows SSH access (port 22) from any IP address",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Restrict SSH access (port 22) to specific IP addresses or the VPC CIDR block",
-          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22)",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 29,
-          "severity": "low",
-          "category": "Database Security",
-          "description": "Database instance is not configured to use AWS Secrets Manager for password management",
-          "cvss": 3.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Use AWS Secrets Manager to manage the database password instead of hardcoding it",
-          "kb_rule": "Secrets Management - ALWAYS use: - AWS Secrets Manager",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.11",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
       "fixed": true,
       "compliance_violations": [
-        "PCI DSS 3.2",
-        "NIST SP 800-171"
+        "CIS AWS Foundations Benchmark 4.1"
       ]
     },
-    "timestamp": "2025-10-11T15:06:56.926003"
+    "timestamp": "2025-10-11T15:07:50.334357"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
