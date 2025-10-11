@@ -644,7 +644,13 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
         # Compliance-focused detection
         issues = self.compliance_detect(code, language, framework, filepath)
         
-        if not issues:
+        # CVE pattern checking (separate from compliance)
+        cve_issues = self.check_code_cves(code, language, filepath)
+        
+        # Combine issues but keep them categorized
+        all_issues = issues + cve_issues
+        
+        if not all_issues:
             print(f"   ✅ No compliance issues found")
             return None
         
@@ -659,9 +665,12 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
             print(f"   📋 Compliance violations: {', '.join(compliance_violations)}")
         
         fixed = False
-        if auto_fix:
+        if auto_fix and all_issues:
             print(f"   🔧 Compliance-focused AI fixing...")
-            fixed_code = self.compliance_fix(code, issues, language, framework)
+            # Only fix compliance issues, not CVE patterns (they need code changes)
+            compliance_issues = [i for i in all_issues if i.get('type') != 'cve_pattern']
+            if compliance_issues:
+                fixed_code = self.compliance_fix(code, compliance_issues, language, framework)
             
             if fixed_code and len(fixed_code) > 50 and fixed_code != code:
                 with open(filepath, 'w') as f:
@@ -794,6 +803,130 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
                 "timestamp": datetime.now().isoformat(),
                 "environment": "development"
             }
+
+    def check_code_cves(self, code, language, filepath):
+        """Check code patterns against NIST CVE database (separate from compliance)"""
+        import requests
+        import time
+        
+        cve_issues = []
+        
+        # Extract potential vulnerable patterns based on language
+        patterns = self.extract_vulnerable_patterns(code, language)
+        
+        if not patterns:
+            return cve_issues
+        
+        print(f"   🔍 Checking {len(patterns)} code patterns against NIST CVE database...")
+        
+        for pattern in patterns[:3]:  # Limit to 3 patterns to avoid rate limits
+            try:
+                # Query NIST CVE API
+                url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+                params = {
+                    'keywordSearch': f"{language} {pattern['keyword']}",
+                    'resultsPerPage': 2
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    for cve in data.get('vulnerabilities', []):
+                        cve_data = cve.get('cve', {})
+                        vuln_id = cve_data.get('id', 'Unknown')
+                        
+                        # Get CVSS score
+                        metrics = cve_data.get('metrics', {})
+                        cvss_score = 'Unknown'
+                        if 'cvssMetricV31' in metrics:
+                            cvss_score = metrics['cvssMetricV31'][0]['cvssData']['baseScore']
+                        elif 'cvssMetricV2' in metrics:
+                            cvss_score = metrics['cvssMetricV2'][0]['cvssData']['baseScore']
+                        
+                        description = cve_data.get('descriptions', [{}])[0].get('value', 'No description')
+                        
+                        cve_issues.append({
+                            'type': 'cve_pattern',
+                            'vulnerability_id': vuln_id,
+                            'pattern': pattern['pattern'],
+                            'line': pattern['line'],
+                            'severity': self.get_cve_severity(cvss_score),
+                            'cvss_score': cvss_score,
+                            'description': description[:150] + '...' if len(description) > 150 else description,
+                            'source': 'NIST_CVE_API'
+                        })
+                
+                time.sleep(0.5)  # Rate limiting
+                
+            except Exception as e:
+                print(f"   ⚠️ CVE API error for pattern '{pattern['keyword']}': {e}")
+        
+        if cve_issues:
+            print(f"   📊 Found {len(cve_issues)} CVE matches for code patterns")
+        
+        return cve_issues
+    
+    def extract_vulnerable_patterns(self, code, language):
+        """Extract potentially vulnerable code patterns"""
+        patterns = []
+        lines = code.split('\n')
+        
+        if language == 'Python':
+            for i, line in enumerate(lines, 1):
+                if 'eval(' in line or 'exec(' in line:
+                    patterns.append({
+                        'pattern': 'eval/exec injection',
+                        'keyword': 'python eval exec injection',
+                        'line': i
+                    })
+                elif 'subprocess.call' in line and 'shell=True' in line:
+                    patterns.append({
+                        'pattern': 'command injection',
+                        'keyword': 'python subprocess shell injection',
+                        'line': i
+                    })
+                elif 'pickle.loads' in line:
+                    patterns.append({
+                        'pattern': 'deserialization',
+                        'keyword': 'python pickle deserialization',
+                        'line': i
+                    })
+        
+        elif language == 'JavaScript':
+            for i, line in enumerate(lines, 1):
+                if 'eval(' in line:
+                    patterns.append({
+                        'pattern': 'eval injection',
+                        'keyword': 'javascript eval injection',
+                        'line': i
+                    })
+                elif 'innerHTML' in line and '+' in line:
+                    patterns.append({
+                        'pattern': 'XSS vulnerability',
+                        'keyword': 'javascript innerHTML XSS',
+                        'line': i
+                    })
+        
+        return patterns
+    
+    def get_cve_severity(self, cvss_score):
+        """Convert CVSS score to severity"""
+        if cvss_score == 'Unknown':
+            return 'medium'
+        try:
+            score = float(cvss_score)
+            if score >= 9.0:
+                return 'critical'
+            elif score >= 7.0:
+                return 'high'
+            elif score >= 4.0:
+                return 'medium'
+            else:
+                return 'low'
+        except:
+            return 'medium'
 
     def log_error(self, message):
         """Log errors securely"""

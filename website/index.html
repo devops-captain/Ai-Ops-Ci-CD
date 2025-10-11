@@ -1385,9 +1385,13 @@
             const modal = document.getElementById('detailModal');
             const modalContent = document.getElementById('modalContent');
             
-            // Use scan context for title
+            // Use scan source for title
             let title = '🔍 Detailed Scan Report';
-            if (report.scan_context) {
+            if (report.scan_source) {
+                const source = report.scan_source.source;
+                const env = report.scan_source.environment;
+                title += ` - ${source} (${env})`;
+            } else if (report.scan_context) {
                 title += ` - ${report.scan_context.scan_name}`;
                 if (report.scan_context.runner) {
                     title += ` (${report.scan_context.runner})`;
@@ -1399,16 +1403,26 @@
             
             let html = `<h2>${title}</h2>`;
             
-            // Add scan context section if available
-            if (report.scan_context) {
+            // Add scan context section - prioritize scan_source over scan_context
+            if (report.scan_source || report.scan_context) {
                 html += `
                     <div class="detail-section">
                         <div class="detail-title">🏷️ Scan Context</div>
-                        <p><strong>Runner:</strong> ${report.scan_context.runner}</p>
-                        ${report.scan_context.repo_name ? `<p><strong>Repository:</strong> ${report.scan_context.repo_name}</p>` : ''}
-                        ${report.scan_context.branch_name ? `<p><strong>Branch:</strong> ${report.scan_context.branch_name}</p>` : ''}
-                        ${report.scan_context.pr_number ? `<p><strong>Pull Request:</strong> #${report.scan_context.pr_number}</p>` : ''}
+                        ${report.scan_source ? `
+                            <p><strong>Source:</strong> ${report.scan_source.source}</p>
+                            <p><strong>Environment:</strong> ${report.scan_source.environment}</p>
+                            <p><strong>Type:</strong> ${report.scan_source.source_type}</p>
+                        ` : ''}
+                        ${report.scan_context ? `
+                            <p><strong>Runner:</strong> ${report.scan_context.runner}</p>
+                            ${report.scan_context.repo_name ? `<p><strong>Repository:</strong> ${report.scan_context.repo_name}</p>` : ''}
+                            ${report.scan_context.branch_name ? `<p><strong>Branch:</strong> ${report.scan_context.branch_name}</p>` : ''}
+                            ${report.scan_context.pr_number ? `<p><strong>Pull Request:</strong> #${report.scan_context.pr_number}</p>` : ''}
+                        ` : ''}
                         <p><strong>Scan Date:</strong> ${report.scan_date || report.timestamp}</p>
+                        ${report.recent_scan_files ? `
+                            <p><strong>Recent Files:</strong> ${report.recent_scan_files.slice(0, 5).join(', ')}${report.recent_scan_files.length > 5 ? '...' : ''}</p>
+                        ` : ''}
                     </div>
                 `;
             }
