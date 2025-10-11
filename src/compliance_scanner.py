@@ -848,14 +848,15 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
                         description = cve_data.get('descriptions', [{}])[0].get('value', 'No description')
                         
                         cve_issues.append({
-                            'type': 'cve_pattern',
+                            'type': 'vulnerability',  # Dashboard expects this type
                             'vulnerability_id': vuln_id,
                             'pattern': pattern['pattern'],
+                            'package': f"{language}_{pattern['pattern']}",  # Dashboard expects package field
                             'line': pattern['line'],
-                            'severity': self.get_cve_severity(cvss_score),
+                            'severity': self.get_cve_severity(cvss_score).upper(),  # Dashboard expects uppercase
                             'cvss_score': cvss_score,
                             'description': description[:150] + '...' if len(description) > 150 else description,
-                            'source': 'NIST_CVE_API'
+                            'source': 'CVE'  # Dashboard expects 'CVE' not 'NIST_CVE_API'
                         })
                 
                 time.sleep(0.5)  # Rate limiting
