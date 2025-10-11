@@ -93,7 +93,11 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "🔧 Auto-fix security issues [skip ci]"
-          git push origin HEAD:${{ github.ref_name }}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git push origin HEAD:${{ github.head_ref }}
+          else
+            git push origin HEAD:${{ github.ref_name }}
+          fi
         fi
     
     - name: Generate PR Comment
