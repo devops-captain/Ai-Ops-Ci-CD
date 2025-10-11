@@ -755,6 +755,46 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
         cache_efficiency = ((10 - report['ai_calls']) / 10) * 100 if report['files_scanned'] > 0 else 0
         print(f"   ⚡ Cache Efficiency: {cache_efficiency:.0f}% (${(0.02 - report['cost']):.4f} saved)")
 
+    def get_scan_source(self):
+        """Detect scan source - local machine or GitHub Actions"""
+        import socket
+        from datetime import datetime
+        
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            # GitHub Actions environment
+            repo = os.environ.get('GITHUB_REPOSITORY', 'unknown/repo')
+            branch = os.environ.get('GITHUB_REF_NAME', 'unknown-branch')
+            pr_number = os.environ.get('GITHUB_PR_NUMBER') or os.environ.get('GITHUB_EVENT_NUMBER')
+            
+            if pr_number:
+                source = f"{repo}/{branch}/PR-{pr_number}"
+                source_type = "github_actions_pr"
+            else:
+                source = f"{repo}/{branch}"
+                source_type = "github_actions_push"
+                
+            return {
+                "source": source,
+                "source_type": source_type,
+                "timestamp": datetime.now().isoformat(),
+                "environment": "ci_cd"
+            }
+        else:
+            # Local machine
+            try:
+                hostname = socket.gethostname()
+                username = os.environ.get('USER', 'unknown')
+                source = f"{username}@{hostname}"
+            except:
+                source = "local-machine"
+                
+            return {
+                "source": source,
+                "source_type": "local",
+                "timestamp": datetime.now().isoformat(),
+                "environment": "development"
+            }
+
     def log_error(self, message):
         """Log errors securely"""
         with open('error_log.txt', 'a') as log_file:
@@ -862,8 +902,10 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
                     print(f"    📋 Violates: {compliance}")
         
         # Save report
+        scan_source = self.get_scan_source()
         report = {
             'scan_date': datetime.now().isoformat(),
+            'scan_source': scan_source,
             'model': self.model_id,
             'knowledge_base_id': self.kb_id,
             'files_scanned': len(files),
@@ -873,6 +915,7 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
             'fixed': fixed_count if auto_fix else 0,
             'by_severity': by_severity,
             'compliance_summary': compliance_summary,
+            'recent_scan_files': [os.path.basename(f) for f in files[:10]],  # Top 10 files scanned
             'results': results
         }
         
