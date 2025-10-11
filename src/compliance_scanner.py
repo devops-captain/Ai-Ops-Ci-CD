@@ -682,7 +682,7 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
             'filepath': filepath,
             'language': language,
             'framework': framework,
-            'issues': issues,
+            'issues': all_issues,  # Include both compliance and CVE issues
             'fixed': fixed,
             'compliance_violations': list(compliance_violations)
         }
