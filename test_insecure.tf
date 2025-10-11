@@ -1,6 +1,25 @@
 # S3 Bucket Security
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+
+  versioning {
+    enabled = true
+  }
+
+  public_access_block {
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+  }
 }
 
 # Security Group Rules
