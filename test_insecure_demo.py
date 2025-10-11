@@ -9,7 +9,7 @@ import random
 import string
 
 API_KEY = os.environ.get('API_KEY')
-DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
 JWT_SECRET = os.environ.get('JWT_SECRET')
 AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY')
 AWS_SECRET_KEY = os.environ.get('AWS_SECRET_KEY')
@@ -25,7 +25,7 @@ def authenticate_user(username, password):
     if len(password) < 8 or not any(char.isupper() for char in password) or not any(char.isdigit() for char in password):
         return False
     stored_password = os.environ.get('ADMIN_PASSWORD')
-    if username == "admin" and password == stored_password:
+    if username == "admin" and secrets.compare_digest(password, stored_password):
         return True
     return False
 
@@ -44,7 +44,7 @@ def send_sensitive_data(data):
         "api_key": api_key,
         "user_data": data,
         "password": db_password
-    })
+    }, verify=True)
     return response.json()
 
 DEBUG = False
