@@ -783,5 +783,101 @@
       ]
     },
     "timestamp": "2025-10-11T14:31:40.904357"
+  },
+  "test_vuln_demo.py": {
+    "hash": "d9b8d8b153a4a751e2fc67019cc5739d7d5b4c07361f2dc0c1024183d212cce6",
+    "result": {
+      "filepath": "test_vuln_demo.py",
+      "language": "Python",
+      "framework": null,
+      "issues": [
+        {
+          "line": 8,
+          "severity": "high",
+          "category": "Secrets Management",
+          "description": "Hardcoded API key",
+          "cvss": 7.5,
+          "compliance_violations": [
+            "PCI DSS 3.2.1 Requirement 3.5.1"
+          ],
+          "remediation": "Use environment variables or a secrets management service like AWS Secrets Manager to store sensitive information.",
+          "kb_rule": "Hardcoded Secrets",
+          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "rule_source": "Secrets Management",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md"
+          ]
+        },
+        {
+          "line": 9,
+          "severity": "high",
+          "category": "Secrets Management",
+          "description": "Hardcoded database password",
+          "cvss": 7.5,
+          "compliance_violations": [
+            "PCI DSS 3.2.1 Requirement 3.5.1"
+          ],
+          "remediation": "Use environment variables or a secrets management service like AWS Secrets Manager to store sensitive information.",
+          "kb_rule": "Hardcoded Secrets",
+          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "rule_source": "Secrets Management",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md"
+          ]
+        },
+        {
+          "line": 13,
+          "severity": "critical",
+          "category": "Input Validation",
+          "description": "Command injection vulnerability",
+          "cvss": 9.8,
+          "compliance_violations": [
+            "OWASP Top 10 A1: Injection"
+          ],
+          "remediation": "Use a safe method like `subprocess.run` with a list of arguments instead of a string to execute commands.",
+          "kb_rule": "Input Validation",
+          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "rule_source": "Input Validation",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md"
+          ]
+        },
+        {
+          "line": 20,
+          "severity": "critical",
+          "category": "Input Validation",
+          "description": "SQL injection vulnerability",
+          "cvss": 9.8,
+          "compliance_violations": [
+            "OWASP Top 10 A1: Injection"
+          ],
+          "remediation": "Use parameterized queries with placeholders to safely pass user input.",
+          "kb_rule": "Input Validation",
+          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "rule_source": "Input Validation",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md"
+          ]
+        }
+      ],
+      "fixed": false,
+      "compliance_violations": [
+        "PCI DSS 3.2.1 Requirement 3.5.1",
+        "OWASP Top 10 A1: Injection"
+      ]
+    },
+    "timestamp": "2025-10-11T21:46:59.378670"
   }
 }
