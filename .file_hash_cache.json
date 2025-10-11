@@ -420,36 +420,118 @@
     "timestamp": "2025-10-10T17:46:07.730196"
   },
   "test_insecure.tf": {
-    "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",
+    "hash": "28c97b2d2974c7cf78d4cd88464d6e334aaa5ab2371f3c80d60deae1bc5901f8",
     "result": {
       "filepath": "test_insecure.tf",
       "language": "Terraform",
       "framework": null,
       "issues": [
         {
-          "line": 40,
-          "severity": "medium",
+          "line": 14,
+          "severity": "high",
           "category": "Security Group",
-          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
-          "cvss": 5.3,
+          "description": "Security group allows SSH access (port 22) from any IP address (0.0.0.0/0), which is not recommended.",
+          "cvss": 7.5,
           "compliance_violations": [
             "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
+          "remediation": "Restrict SSH access to a specific IP address or range of IP addresses.",
           "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "Security Knowledge Base",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "Security Group Rules",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 30,
+          "severity": "low",
+          "category": "Database Security",
+          "description": "Database encryption is enabled, which is a good security practice.",
+          "cvss": 3.0,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 3.8"
+          ],
+          "remediation": "No remediation required.",
+          "kb_rule": "Database Security - Enable encryption: `storage_encrypted = true`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "Database Security",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 31,
+          "severity": "low",
+          "category": "Database Security",
+          "description": "Database deletion protection is enabled, which is a good security practice.",
+          "cvss": 3.0,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 3.9"
+          ],
+          "remediation": "No remediation required.",
+          "kb_rule": "Database Security - Use `deletion_protection = true`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "Database Security",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 2,
+          "severity": "medium",
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have server-side encryption enabled, which is a security best practice.",
+          "cvss": 5.0,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 2.2"
+          ],
+          "remediation": "Enable server-side encryption for the S3 bucket.",
+          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "S3 Bucket Security",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 21,
+          "severity": "low",
+          "category": "Security Group",
+          "description": "Security group allows HTTPS access (port 443) from any IP address (0.0.0.0/0), which is a good security practice.",
+          "cvss": 3.0,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 4.2"
+          ],
+          "remediation": "No remediation required.",
+          "kb_rule": "Security Groups - Use least privilege principle",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "Security Group Rules",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": false,
+      "fixed": true,
       "compliance_violations": [
-        "CIS AWS Foundations Benchmark 4.1"
+        "CIS AWS Foundations Benchmark 3.8",
+        "CIS AWS Foundations Benchmark 3.9",
+        "CIS AWS Foundations Benchmark 4.1",
+        "CIS AWS Foundations Benchmark 2.2",
+        "CIS AWS Foundations Benchmark 4.2"
       ]
     },
-    "timestamp": "2025-10-11T14:44:50.011630"
+    "timestamp": "2025-10-11T14:47:18.566537"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
