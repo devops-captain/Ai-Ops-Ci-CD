@@ -427,113 +427,29 @@
       "framework": null,
       "issues": [
         {
-          "line": 2,
+          "line": 40,
           "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have server-side encryption enabled",
-          "cvss": 5.5,
+          "category": "Security Group",
+          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
+          "cvss": 5.3,
           "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
+            "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Enable server-side encryption for the S3 bucket using the `server_side_encryption_configuration` block",
-          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
+          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
+          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
+          "rfc_document": "terraform_security.md",
+          "rule_source": "Security Knowledge Base",
           "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 2,
-          "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have versioning enabled",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Enable versioning for the S3 bucket using the `versioning { enabled = true }` block",
-          "kb_rule": "S3 Bucket Security - Enable versioning: `versioning { enabled = true }`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 2,
-          "severity": "medium",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have public access blocked",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Block public access to the S3 bucket using the `public_access_block` block",
-          "kb_rule": "S3 Bucket Security - Block public access: `block_public_acls = true`",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 21,
-          "severity": "medium",
-          "category": "Security Group Rules",
-          "description": "Security group allows SSH access (port 22) from any IP address",
-          "cvss": 5.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Restrict SSH access (port 22) to specific IP addresses or the VPC CIDR block",
-          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22)",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.1",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 29,
-          "severity": "low",
-          "category": "Database Security",
-          "description": "Database instance is not configured to use AWS Secrets Manager for password management",
-          "cvss": 3.5,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS 3.2"
-          ],
-          "remediation": "Use AWS Secrets Manager to manage the database password instead of hardcoding it",
-          "kb_rule": "Secrets Management - ALWAYS use: - AWS Secrets Manager",
-          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
-          "rule_source": "Section 3.13.11",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": true,
+      "fixed": false,
       "compliance_violations": [
-        "PCI DSS 3.2",
-        "NIST SP 800-171"
+        "CIS AWS Foundations Benchmark 4.1"
       ]
     },
-    "timestamp": "2025-10-11T15:06:56.926003"
+    "timestamp": "2025-10-11T17:04:41.897447"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
@@ -785,7 +701,7 @@
     "timestamp": "2025-10-11T14:31:40.904357"
   },
   "test_vuln_demo.py": {
-    "hash": "d9b8d8b153a4a751e2fc67019cc5739d7d5b4c07361f2dc0c1024183d212cce6",
+    "hash": "2a25889c9e66c045590d33ca8e767338e1866353f7883a1d1626bb50d1ff5a07",
     "result": {
       "filepath": "test_vuln_demo.py",
       "language": "Python",
@@ -798,16 +714,16 @@
           "description": "Hardcoded API key",
           "cvss": 7.5,
           "compliance_violations": [
-            "PCI DSS 3.2.1 Requirement 3.5.1"
+            "General Security Patterns - Hardcoded Secrets"
           ],
-          "remediation": "Use environment variables or a secrets management service like AWS Secrets Manager to store sensitive information.",
-          "kb_rule": "Hardcoded Secrets",
-          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
-          "rule_source": "Secrets Management",
+          "remediation": "Use environment variables, AWS Secrets Manager, or Kubernetes secrets instead of hardcoding sensitive information.",
+          "kb_rule": "Secrets Management - Hardcoded API keys",
+          "rfc_document": "general_security.md, general_security.md, sample_kb_content.md, sample_kb_content.md",
+          "rule_source": "Hardcoded Secrets",
           "s3_sources": [
             "s3://ai-security-kb-docs-2025/general_security.md",
-            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/sample_kb_content.md"
           ]
         },
@@ -818,16 +734,16 @@
           "description": "Hardcoded database password",
           "cvss": 7.5,
           "compliance_violations": [
-            "PCI DSS 3.2.1 Requirement 3.5.1"
+            "General Security Patterns - Hardcoded Secrets"
           ],
-          "remediation": "Use environment variables or a secrets management service like AWS Secrets Manager to store sensitive information.",
-          "kb_rule": "Hardcoded Secrets",
-          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
-          "rule_source": "Secrets Management",
+          "remediation": "Use environment variables, AWS Secrets Manager, or Kubernetes secrets instead of hardcoding sensitive information.",
+          "kb_rule": "Secrets Management - Hardcoded passwords",
+          "rfc_document": "general_security.md, general_security.md, sample_kb_content.md, sample_kb_content.md",
+          "rule_source": "Hardcoded Secrets",
           "s3_sources": [
             "s3://ai-security-kb-docs-2025/general_security.md",
-            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/sample_kb_content.md"
           ]
         },
@@ -838,16 +754,16 @@
           "description": "Command injection vulnerability",
           "cvss": 9.8,
           "compliance_violations": [
-            "OWASP Top 10 A1: Injection"
+            "Shell Script Security - Input Validation"
           ],
-          "remediation": "Use a safe method like `subprocess.run` with a list of arguments instead of a string to execute commands.",
-          "kb_rule": "Input Validation",
-          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "remediation": "Use proper input validation techniques, such as using a whitelist or regular expressions, to ensure that user input does not contain malicious commands.",
+          "kb_rule": "Input Validation - Command injection",
+          "rfc_document": "general_security.md, general_security.md, sample_kb_content.md, sample_kb_content.md",
           "rule_source": "Input Validation",
           "s3_sources": [
             "s3://ai-security-kb-docs-2025/general_security.md",
-            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/sample_kb_content.md"
           ]
         },
@@ -858,26 +774,27 @@
           "description": "SQL injection vulnerability",
           "cvss": 9.8,
           "compliance_violations": [
-            "OWASP Top 10 A1: Injection"
+            "Python Security Rules - Input Validation"
           ],
-          "remediation": "Use parameterized queries with placeholders to safely pass user input.",
-          "kb_rule": "Input Validation",
-          "rfc_document": "general_security.md, sample_kb_content.md, general_security.md, sample_kb_content.md",
+          "remediation": "Use parameterized queries to prevent SQL injection vulnerabilities.",
+          "kb_rule": "Input Validation - SQL injection",
+          "rfc_document": "general_security.md, general_security.md, sample_kb_content.md, sample_kb_content.md",
           "rule_source": "Input Validation",
           "s3_sources": [
             "s3://ai-security-kb-docs-2025/general_security.md",
-            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/general_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/sample_kb_content.md"
           ]
         }
       ],
-      "fixed": false,
+      "fixed": true,
       "compliance_violations": [
-        "PCI DSS 3.2.1 Requirement 3.5.1",
-        "OWASP Top 10 A1: Injection"
+        "Shell Script Security - Input Validation",
+        "Python Security Rules - Input Validation",
+        "General Security Patterns - Hardcoded Secrets"
       ]
     },
-    "timestamp": "2025-10-11T21:46:59.378670"
+    "timestamp": "2025-10-11T17:04:32.588417"
   }
 }
