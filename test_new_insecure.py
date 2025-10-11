@@ -6,10 +6,24 @@ import pickle
 from boto3 import client
 from secrets import token_urlsafe
 
-# Use environment variables for secrets
+# Use AWS Secrets Manager for secrets
 SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    secrets_client = client('secretsmanager')
+    secret = secrets_client.get_secret_value(SecretId='secret-key')
+    SECRET_KEY = secret['SecretString']
+
 DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    secrets_client = client('secretsmanager')
+    secret = secrets_client.get_secret_value(SecretId='database-url')
+    DATABASE_URL = secret['SecretString']
+
 AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY')
+if not AWS_ACCESS_KEY:
+    secrets_client = client('secretsmanager')
+    secret = secrets_client.get_secret_value(SecretId='aws-access-key')
+    AWS_ACCESS_KEY = secret['SecretString']
 
 def execute_command(user_input):
     if not isinstance(user_input, str) or not user_input.isalnum():
