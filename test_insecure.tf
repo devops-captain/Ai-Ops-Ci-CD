@@ -1,4 +1,4 @@
-# S3 Bucket Security
+## S3 Bucket Security
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
 }
