@@ -1,7 +1,6 @@
 # S3 Bucket Security
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
-
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
@@ -9,11 +8,9 @@ resource "aws_s3_bucket" "secure" {
       }
     }
   }
-
   versioning {
     enabled = true
   }
-
   public_access_block {
     block_public_acls       = true
     block_public_policy     = true
@@ -30,14 +27,14 @@ resource "aws_security_group" "secure" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/8"] # Restrict to VPC
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # HTTPS only
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
@@ -53,7 +50,6 @@ resource "aws_db_instance" "secure" {
   manage_master_user_password = true
   vpc_security_group_ids = [aws_security_group.db.id]
 
-  # Use AWS Secrets Manager for database password
   password = data.aws_secretsmanager_secret_version.db_password.secret_string
 }
 
