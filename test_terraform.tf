@@ -4,24 +4,6 @@
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
 
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-
-  versioning {
-    enabled = true
-  }
-
-  public_access_block {
-    block_public_acls       = true
-    block_public_policy     = true
-    ignore_public_acls      = true
-    restrict_public_buckets = true
-  }
 }
 
 ################
@@ -37,7 +19,7 @@ resource "aws_security_group" "secure" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    cidr_blocks     = ["10.0.0.0/8"]
+    cidr_blocks     = ["0.0.0.0/0"]
   }
 
   ingress {
@@ -68,7 +50,7 @@ resource "aws_db_instance" "secure_db" {
   instance_class          = "db.t3.micro"
   name                    = "securedb"
   username                = "admin"
-  password                = random_password.db_password.result
+  password                = lopkkjhkhjhj
   skip_final_snapshot     = true
   publicly_accessible     = false
   storage_encrypted       = true
@@ -77,18 +59,4 @@ resource "aws_db_instance" "secure_db" {
   monitoring_interval     = 60
 
   manage_master_user_password = true
-}
-
-resource "aws_secretsmanager_secret" "db_password" {
-  name = "db-password"
-}
-
-resource "aws_secretsmanager_secret_version" "db_password" {
-  secret_id     = aws_secretsmanager_secret.db_password.id
-  secret_string = random_password.db_password.result
-}
-
-resource "random_password" "db_password" {
-  length  = 16
-  special = true
 }
