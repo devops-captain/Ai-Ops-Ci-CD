@@ -944,6 +944,8 @@
                 
                 // Use scan context if available, fallback to timestamp
                 let displayName = '';
+                let branchInfo = '';
+                
                 if (report.scan_context) {
                     displayName = report.scan_context.scan_name;
                 } else if (report.timestamp) {
@@ -952,11 +954,16 @@
                     displayName = 'Unknown';
                 }
                 
+                // Add branch name if available
+                if (report.branch_name && report.branch_name !== 'unknown') {
+                    branchInfo = ` (🌿 ${report.branch_name})`;
+                }
+                
                 const runner = report.scan_context?.runner || 'Unknown';
                 const runnerIcon = runner.includes('GitHub') ? '🔄' : runner.includes('Local') ? '💻' : '🤖';
                 
                 row.innerHTML = `
-                    <td class="timestamp-cell">${runnerIcon} ${displayName}</td>
+                    <td class="timestamp-cell">${runnerIcon} ${displayName}${branchInfo}</td>
                     <td>${report.files_scanned}</td>
                     <td><span class="severity-badge severity-critical">${report.by_severity?.critical || 0}</span></td>
                     <td><span class="severity-badge severity-high">${report.by_severity?.high || 0}</span></td>
@@ -1404,7 +1411,7 @@
             let html = `<h2>${title}</h2>`;
             
             // Add scan context section - prioritize scan_source over scan_context
-            if (report.scan_source || report.scan_context) {
+            if (report.scan_source || report.scan_context || report.branch_name) {
                 html += `
                     <div class="detail-section">
                         <div class="detail-title">🏷️ Scan Context</div>
@@ -1419,6 +1426,7 @@
                             ${report.scan_context.branch_name ? `<p><strong>Branch:</strong> ${report.scan_context.branch_name}</p>` : ''}
                             ${report.scan_context.pr_number ? `<p><strong>Pull Request:</strong> #${report.scan_context.pr_number}</p>` : ''}
                         ` : ''}
+                        ${report.branch_name && report.branch_name !== 'unknown' ? `<p><strong>🌿 Branch:</strong> ${report.branch_name}</p>` : ''}
                         <p><strong>Scan Date:</strong> ${report.scan_date || report.timestamp}</p>
                         ${report.recent_scan_files ? `
                             <p><strong>Recent Files:</strong> ${report.recent_scan_files.slice(0, 5).join(', ')}${report.recent_scan_files.length > 5 ? '...' : ''}</p>
