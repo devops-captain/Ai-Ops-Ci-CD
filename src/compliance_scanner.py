@@ -769,15 +769,42 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
         """Get current git branch name"""
         try:
             import subprocess
+            
+            # First try to get branch from GitHub Actions environment variables
+            github_branch = os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF_NAME')
+            if github_branch and github_branch != 'HEAD':
+                return github_branch
+            
+            # Try git symbolic-ref first (works for normal branches)
+            result = subprocess.run(['git', 'symbolic-ref', '--short', 'HEAD'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                branch = result.stdout.strip()
+                if branch and branch != 'HEAD':
+                    return branch
+            
+            # Fallback to git rev-parse (may return HEAD for detached state)
             result = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
                                   capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
-                return result.stdout.strip()
+                branch = result.stdout.strip()
+                if branch and branch != 'HEAD':
+                    return branch
+                    
+            # If we get HEAD, try to get the actual branch name from remote
+            result = subprocess.run(['git', 'branch', '-r', '--contains', 'HEAD'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                branches = result.stdout.strip().split('\n')
+                for branch in branches:
+                    branch = branch.strip()
+                    if 'origin/' in branch and 'HEAD' not in branch:
+                        return branch.replace('origin/', '')
+                        
         except:
             pass
         
-        # Fallback to environment variables (GitHub Actions)
-        return os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF_NAME') or 'unknown'
+        return 'main'  # Default fallback instead of 'unknown'
 
     def get_scan_source(self):
         """Detect scan source - local machine or GitHub Actions"""

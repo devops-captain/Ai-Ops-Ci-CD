@@ -954,8 +954,8 @@
                     displayName = 'Unknown';
                 }
                 
-                // Add branch name if available
-                if (report.branch_name && report.branch_name !== 'unknown') {
+                // Add branch name if available (show all branches including main)
+                if (report.branch_name && report.branch_name !== 'unknown' && report.branch_name !== 'HEAD') {
                     branchInfo = ` (🌿 ${report.branch_name})`;
                 }
                 
@@ -1426,7 +1426,7 @@
                             ${report.scan_context.branch_name ? `<p><strong>Branch:</strong> ${report.scan_context.branch_name}</p>` : ''}
                             ${report.scan_context.pr_number ? `<p><strong>Pull Request:</strong> #${report.scan_context.pr_number}</p>` : ''}
                         ` : ''}
-                        ${report.branch_name && report.branch_name !== 'unknown' ? `<p><strong>🌿 Branch:</strong> ${report.branch_name}</p>` : ''}
+                        ${report.branch_name && report.branch_name !== 'unknown' && report.branch_name !== 'HEAD' ? `<p><strong>🌿 Branch:</strong> ${report.branch_name}</p>` : ''}
                         <p><strong>Scan Date:</strong> ${report.scan_date || report.timestamp}</p>
                         ${report.recent_scan_files ? `
                             <p><strong>Recent Files:</strong> ${report.recent_scan_files.slice(0, 5).join(', ')}${report.recent_scan_files.length > 5 ? '...' : ''}</p>
