@@ -749,6 +749,7 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
     def print_executive_summary(self, report):
         """Print executive summary for leadership"""
         print(f"\n📊 Organization Knowledge Base Analysis Summary:")
+        print(f"   🌿 Branch: {report.get('branch_name', 'unknown')}")
         print(f"   🧠 Policy Compliance: {'🔴 CRITICAL' if report['by_severity']['critical'] > 0 else '🟡 NEEDS ATTENTION' if report['by_severity']['high'] > 0 else '🟢 GOOD'}")
         print(f"   📁 Code Coverage: {report['files_scanned']} files analyzed against your policies")
         print(f"   🎯 Risk Level: {report['by_severity']['critical']} critical, {report['by_severity']['high']} high priority policy violations")
@@ -763,6 +764,20 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
         # Cache efficiency
         cache_efficiency = ((10 - report['ai_calls']) / 10) * 100 if report['files_scanned'] > 0 else 0
         print(f"   ⚡ Cache Efficiency: {cache_efficiency:.0f}% (${(0.02 - report['cost']):.4f} saved)")
+
+    def get_branch_name(self):
+        """Get current git branch name"""
+        try:
+            import subprocess
+            result = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except:
+            pass
+        
+        # Fallback to environment variables (GitHub Actions)
+        return os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF_NAME') or 'unknown'
 
     def get_scan_source(self):
         """Detect scan source - local machine or GitHub Actions"""
@@ -1038,9 +1053,11 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
         
         # Save report
         scan_source = self.get_scan_source()
+        branch_name = self.get_branch_name()
         report = {
             'scan_date': datetime.now().isoformat(),
             'scan_source': scan_source,
+            'branch_name': branch_name,
             'model': self.model_id,
             'knowledge_base_id': self.kb_id,
             'files_scanned': len(files),

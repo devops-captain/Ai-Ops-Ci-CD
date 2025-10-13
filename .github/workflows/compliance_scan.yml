@@ -132,7 +132,7 @@ jobs:
                   const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
                   issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
                   
-                  for (const issue of issues.slice(0, 5)) {
+                  for (const issue of issues) {
                     const emoji = issue.severity === 'critical' ? '🚨' : issue.severity === 'high' ? '⚠️' : 'ℹ️';
                     comment += `${emoji} **Line ${issue.line}: ${issue.severity.toUpperCase()}**\n\n`;
                     comment += `**📝 Issue Description:**\n${issue.description}\n\n`;
@@ -154,10 +154,6 @@ jobs:
                     }
                     
                     comment += `---\n\n`;
-                  }
-                  
-                  if (issues.length > 5) {
-                    comment += `... and ${issues.length - 5} more violations\n\n`;
                   }
                 }
               }
