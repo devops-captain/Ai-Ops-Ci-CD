@@ -377,36 +377,144 @@
     "timestamp": "2025-10-13T03:29:26.148519"
   },
   "test_insecure.tf": {
-    "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",
+    "hash": "37f5cd4c197e2e7d1e2319fc0056f414aa03ab7600ba9f2cf86ec1d5b2892751",
     "result": {
       "filepath": "test_insecure.tf",
       "language": "Terraform",
       "framework": null,
       "issues": [
         {
-          "line": 40,
+          "line": 4,
           "severity": "medium",
-          "category": "Security Group",
-          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
-          "cvss": 5.3,
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have server-side encryption enabled",
+          "cvss": 5.5,
           "compliance_violations": [
-            "Security Group Best Practices"
+            "AWS S3 Bucket Encryption Best Practices"
           ],
-          "remediation": "Restrict HTTPS traffic to specific IP addresses or ranges using the `cidr_blocks` parameter",
-          "kb_rule": "Security Group Rules - Use least privilege principle",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "Security Knowledge Base",
+          "remediation": "Enable server-side encryption for the S3 bucket using the `server_side_encryption_configuration` block",
+          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "Terraform Security Best Practices",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 4,
+          "severity": "medium",
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have versioning enabled",
+          "cvss": 5.5,
+          "compliance_violations": [
+            "AWS S3 Bucket Versioning Best Practices"
+          ],
+          "remediation": "Enable versioning for the S3 bucket using the `versioning` block",
+          "kb_rule": "S3 Bucket Security - Enable versioning: `versioning { enabled = true }`",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "Terraform Security Best Practices",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 4,
+          "severity": "medium",
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have public access blocked",
+          "cvss": 5.5,
+          "compliance_violations": [
+            "AWS S3 Bucket Public Access Blocking Best Practices"
+          ],
+          "remediation": "Block public access to the S3 bucket using the `public_access_block` block",
+          "kb_rule": "S3 Bucket Security - Block public access: `block_public_acls = true`",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "Terraform Security Best Practices",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 14,
+          "severity": "high",
+          "category": "Security Group Rules",
+          "description": "Security group allows SSH access (port 22) from 0.0.0.0/0 (the entire internet)",
+          "cvss": 8.0,
+          "compliance_violations": [
+            "AWS Security Group Best Practices"
+          ],
+          "remediation": "Restrict SSH access (port 22) to specific IP addresses or a VPC",
+          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "Terraform Security Best Practices",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 29,
+          "severity": "high",
+          "category": "Database Security",
+          "description": "Database is publicly accessible",
+          "cvss": 8.0,
+          "compliance_violations": [
+            "AWS RDS Security Best Practices"
+          ],
+          "remediation": "Set `publicly_accessible = false` to make the database private",
+          "kb_rule": "Database Security - Set `publicly_accessible = false`",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "Terraform Security Best Practices",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 38,
+          "severity": "high",
+          "category": "Secrets Management",
+          "description": "Database password is hardcoded in the Terraform configuration",
+          "cvss": 8.0,
+          "compliance_violations": [
+            "AWS Secrets Manager Best Practices"
+          ],
+          "remediation": "Use AWS Secrets Manager to store the database password securely",
+          "kb_rule": "Hardcoded Secrets NEVER use: - password = \"plaintext\" - ALWAYS use: - AWS Secrets Manager",
+          "rfc_document": "terraform_security.md, terraform_security.md, sample_kb_content.md, terraform_security.md",
+          "rule_source": "General Security Patterns",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/sample_kb_content.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": false,
+      "fixed": true,
       "compliance_violations": [
-        "Security Group Best Practices"
+        "AWS S3 Bucket Encryption Best Practices",
+        "AWS S3 Bucket Versioning Best Practices",
+        "AWS S3 Bucket Public Access Blocking Best Practices",
+        "AWS Secrets Manager Best Practices",
+        "AWS RDS Security Best Practices",
+        "AWS Security Group Best Practices"
       ]
     },
-    "timestamp": "2025-10-13T09:28:08.814616"
+    "timestamp": "2025-10-13T09:31:11.406624"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
