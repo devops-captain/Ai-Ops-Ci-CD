@@ -1,15 +1,15 @@
-# ThreatLens Scanner - Technical Architecture
+# AI Compliance Scanner - Technical Architecture
 
 ## System Architecture
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ThreatLens Scanner                       │
+│            Organization Knowledge Base Platform             │
 ├─────────────────────────────────────────────────────────────┤
-│ Scanner Engine │ AI Analysis │ CVE Detection │ Auto-Fix     │
+│ Policy Engine │ AI Analysis │ CVE Detection │ Compliance   │
 ├─────────────────────────────────────────────────────────────┤
-│           AWS Bedrock Claude 3 Haiku Model                 │
+│           AWS Bedrock Claude 3 Model                       │
 ├─────────────────────────────────────────────────────────────┤
-│    Knowledge Base RL3YC1HUKZ │ S3 Vector Database          │
+│    Your Knowledge Base │ S3 Document Storage               │
 ├─────────────────────────────────────────────────────────────┤
 │ NIST CVE API │ GitHub Actions │ S3 Reports │ Cost Controls │
 └─────────────────────────────────────────────────────────────┘
@@ -17,129 +17,132 @@
 
 ## Core Components
 
-### 1. AI Analysis Engine
-- **Model**: Claude 3 Haiku (cost-optimized)
-- **Temperature**: 0 (deterministic results)
-- **Token Optimization**: 40% reduction through smart prompting
-- **Cost**: $0.25 per 1K tokens vs $15 for Claude Opus
+### 1. AI Policy Interpretation Engine
+- **Model**: Claude 3 (natural language policy processing)
+- **Temperature**: 0 (deterministic policy enforcement)
+- **Policy Understanding**: Interprets your documents contextually
+- **Cost**: $0.25 per 1K tokens for policy analysis
 
-### 2. Knowledge Base Integration
-- **KB ID**: RL3YC1HUKZ with 5 active data sources
-- **Storage**: S3 bucket ai-security-kb-docs-2025
-- **Embeddings**: Amazon Titan Text Embeddings v1
-- **Query Cost**: $0.0002 per query with 70% cache hit rate
+### 2. Organization Knowledge Base
+- **Your Documents**: Upload security policies, RFCs, compliance standards
+- **Storage**: S3 bucket with your organization's policy documents
+- **Embeddings**: Amazon Titan Text for semantic policy search
+- **Query Cost**: $0.0002 per policy query with 70% cache hit rate
 
-### 3. CVE Detection Engine
-- **Source**: NIST services.nvd.nist.gov/rest/json/cves/2.0
-- **Pattern Matching**: Language-specific vulnerability patterns
-- **Real-time Updates**: Direct API integration, no database lag
-- **Correlation**: Code patterns → Known CVEs → Severity scoring
+### 3. Policy Violation Detection
+- **Source**: Your uploaded policy documents vs generic rules
+- **Pattern Matching**: Code patterns against YOUR specific requirements
+- **Contextual Analysis**: AI correlates violations with your policy sources
+- **Traceability**: Links violations back to specific policy documents
 
 ### 4. Production Features
 - **Cost Controls**: MAX_AI_CALLS=100, MAX_COST_USD=$5.00
-- **Intelligent Caching**: 90% hit rate with SHA-256 file hashing
+- **Intelligent Caching**: 90% hit rate with policy-aware caching
 - **Error Handling**: Exponential backoff for API rate limits
-- **Source Tracking**: Local vs GitHub Actions environment detection
+- **Policy Versioning**: Track changes to your policy documents
 
 ## Performance Metrics
 
-### Scanning Performance
+### Policy Analysis Performance
 - **Speed**: 10 files per second processing
-- **Accuracy**: >98% vulnerability detection rate
-- **False Positives**: <5% vs 15-25% industry average
-- **Languages**: Python, JavaScript, Terraform, Kubernetes YAML
+- **Accuracy**: >98% policy violation detection (organization-specific)
+- **False Positives**: <5% vs 10-25% with generic tools
+- **Domains**: Infrastructure, Application Code, Configuration files
 
 ### Cost Optimization
-- **Per Scan**: $0.02-0.04 comprehensive analysis
-- **Cache Savings**: $0.0186 saved per cached file
-- **Token Efficiency**: 3,600 average tokens vs 6,000 baseline
+- **Per Analysis**: $0.02-0.04 comprehensive policy check
+- **Cache Savings**: $0.0186 saved per cached policy query
+- **Token Efficiency**: Optimized prompts for policy interpretation
 - **API Optimization**: Batch processing reduces calls by 60%
 
 ### Reliability Metrics
 - **Uptime**: 99.99% availability target
 - **Error Rate**: <0.1% with comprehensive retry logic
-- **Response Time**: <200ms average KB query response
+- **Response Time**: <200ms average policy query response
 - **Scalability**: Lambda-ready for horizontal scaling
 
-## Security & Compliance
+## Policy Management & Compliance
 
-### Data Protection
-- **Encryption**: AES-256 for S3 storage, TLS 1.2 in transit
-- **Access Control**: IAM roles with least privilege principle
-- **Audit Trail**: Complete scan history with source tracking
-- **Privacy**: Code never leaves AWS environment
+### Your Organization's Standards
+- **Custom Policies** - Upload your security policies and standards
+- **RFC Documents** - Your organization's technical requirements
+- **Compliance Frameworks** - Your specific regulatory requirements
+- **Security Guidelines** - Your internal security best practices
+- **Industry Standards** - Relevant standards for your industry
 
-### Compliance Standards
-- **OWASP Top 10** - Web application security risks
-- **PCI DSS 3.2** - Payment card industry standards
-- **NIST SP 800-171** - Federal information systems
-- **CIS Controls** - Critical security controls
-- **SOC2** - Service organization controls
+### Policy Features
+- **Natural Language Processing** - AI understands your policy documents
+- **Contextual Analysis** - Correlates code with your specific requirements
+- **Policy Traceability** - Links violations back to source documents
+- **Version Control** - Track policy changes and their impact
 
 ## Integration Architecture
 
 ### CI/CD Integration
 ```yaml
 # GitHub Actions Workflow
-- Automated scanning on PR/push/schedule
-- Auto-fix commits with [skip ci] tags
-- PR blocking on critical vulnerabilities
-- Detailed comments with severity breakdown
-- S3 report upload with web dashboard
+- Organization policy analysis on PR/push/schedule
+- Policy violation blocking on critical issues
+- Detailed comments with policy source traceability
+- S3 report upload with policy compliance dashboard
 ```
 
 ### API Architecture (Future)
 ```
-POST /v1/scan - Initiate security scan
-GET /v1/scan/{id} - Retrieve scan results
-POST /v1/webhook - CI/CD integration endpoint
-GET /v1/vulnerabilities - CVE database queries
+POST /v1/analyze - Initiate policy analysis
+GET /v1/analyze/{id} - Retrieve analysis results
+POST /v1/policies - Upload policy documents
+GET /v1/policies/{id} - Retrieve policy content
 ```
 
 ## Deployment Strategy
 
 ### Multi-Environment Setup
-- **Development**: Cost limit $1.00, relaxed thresholds
-- **Staging**: Production-like config, performance testing
-- **Production**: Full monitoring, strict cost controls
+- **Development**: Policy testing with relaxed thresholds
+- **Staging**: Production-like policy enforcement
+- **Production**: Full policy compliance monitoring
 
 ### Scaling Architecture
-- **Horizontal**: AWS Lambda for parallel processing
-- **Vertical**: Optimized instance types for AI workloads
-- **Global**: Multi-region deployment with edge caching
+- **Horizontal**: AWS Lambda for parallel policy processing
+- **Vertical**: Optimized instances for AI policy workloads
+- **Global**: Multi-region deployment with policy synchronization
 
 ## Monitoring & Observability
 
 ### Key Metrics
-- **Cost per Scan**: Real-time tracking with alerts
-- **Cache Hit Rate**: Target 90%+ efficiency
-- **AI Model Latency**: <500ms response time
-- **Error Rates**: <0.1% failure rate
+- **Policy Analysis Cost**: Real-time tracking with alerts
+- **Cache Hit Rate**: Target 90%+ efficiency for policy queries
+- **AI Model Latency**: <500ms policy interpretation
+- **Policy Accuracy**: >98% violation detection rate
 
 ### Alerting
 - **Cost Threshold**: 80% and 95% of daily limits
-- **Performance Degradation**: >60 second scan times
-- **Error Spikes**: >5% error rate triggers investigation
+- **Performance Degradation**: >60 second analysis times
+- **Policy Conflicts**: Conflicting policy rules detection
 - **Capacity Planning**: Proactive scaling recommendations
 
 ## Future Technical Roadmap
 
-### Phase 1: API Gateway (Q1 2025)
-- RESTful API with authentication
-- Rate limiting and usage analytics
-- Webhook support for external integrations
+### Phase 1: Policy Management Platform (Q1 2025)
+- Policy version control and governance
+- Multi-format document support (PDF, Word, etc.)
+- Policy impact analysis
+- Automated policy recommendations
 
-### Phase 2: Multi-Cloud (Q2 2025)
-- Azure Cognitive Services integration
-- GCP Vertex AI compatibility
-- Unified cross-cloud dashboard
+### Phase 2: AI Policy Assistant (Q2 2025)
+- Natural language policy queries
+- Policy conflict detection
+- Automated policy updates
+- Multi-cloud policy enforcement
 
-### Phase 3: Custom Models (Q3 2025)
-- Organization-specific pattern training
-- Industry-specific compliance rules
-- Continuous learning from scan results
+### Phase 3: Enterprise Integration (Q3 2025)
+- Policy management system integrations
+- Advanced compliance dashboards
+- Audit trail and reporting
+- LDAP integration and SSO
 
-### Phase 4: Global Platform (Q4 2025)
-- Multi-region deployment
-- Edge computing integration
-- Real-time collaboration features
+### Phase 4: Global Compliance (Q4 2025)
+- Multi-region policy enforcement
+- Industry-specific policy templates
+- Real-time policy collaboration
+- Advanced analytics and insights

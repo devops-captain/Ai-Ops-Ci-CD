@@ -2,7 +2,7 @@
 
 ## Overview
 
-ThreatLens Scanner uses AWS Bedrock Knowledge Base (KB ID: RL3YC1HUKZ) with S3 vector database and embeddings for semantic search of compliance documents.
+AI Compliance Scanner uses AWS Bedrock Knowledge Base (KB ID: RL3YC1HUKZ) with S3 vector database and embeddings for semantic search of compliance documents.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ graph TB
     B --> C[Knowledge Base RL3YC1HUKZ]
     C --> D[Vector Embeddings]
     D --> E[Semantic Search]
-    E --> F[ThreatLens Scanner]
+    E --> F[AI Compliance Scanner]
     
     subgraph "Document Types"
         G[OWASP Guidelines]
@@ -129,7 +129,7 @@ aws s3 ls s3://your-kb-bucket-name/ --recursive
 ```bash
 # Create knowledge base (via AWS Console or CLI)
 aws bedrock-agent create-knowledge-base \
-  --name "ThreatLens-Security-KB" \
+  --name "AI Compliance Scanner-Security-KB" \
   --description "Security compliance knowledge base" \
   --role-arn "arn:aws:iam::account:role/BedrockKBRole" \
   --knowledge-base-configuration '{

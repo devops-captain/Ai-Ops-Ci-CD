@@ -1,8 +1,8 @@
-# ThreatLens Scanner Architecture
+# AI Compliance Scanner Architecture
 
 ## System Overview
 
-ThreatLens Scanner is a cloud-native, AI-powered security analysis platform built on AWS services with a focus on cost optimization, scalability, and production reliability.
+AI Compliance Scanner is a cloud-native, AI-powered security analysis platform built on AWS services with a focus on cost optimization, scalability, and production reliability.
 
 ## High-Level Architecture
 
@@ -14,7 +14,7 @@ graph TB
         C[CI/CD Pipeline]
     end
     
-    subgraph "ThreatLens Core"
+    subgraph "AI Compliance Scanner Core"
         D[Scanner Engine]
         E[AI Analysis Module]
         F[CVE Detection Engine]
@@ -195,7 +195,7 @@ class AutoFixEngine:
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
-    participant Scanner as ThreatLens Scanner
+    participant Scanner as AI Compliance Scanner
     participant Cache as File Cache
     participant AI as Bedrock Claude 3
     participant KB as Knowledge Base
@@ -324,7 +324,7 @@ SECURITY_CONFIG = {
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::account:role/ThreatLensRole"
+        "AWS": "arn:aws:iam::account:role/AI Compliance ScannerRole"
       },
       "Action": [
         "bedrock:InvokeModel",
@@ -410,7 +410,7 @@ class MonitoringSystem:
         # Publish to CloudWatch
         for metric_name, value in metrics.items():
             self.cloudwatch.put_metric_data(
-                Namespace='ThreatLens/Scanner',
+                Namespace='AI Compliance Scanner/Scanner',
                 MetricData=[{
                     'MetricName': metric_name,
                     'Value': value,
@@ -477,10 +477,10 @@ graph TB
 ```yaml
 # CloudFormation template excerpt
 Resources:
-  ThreatLensKnowledgeBase:
+  AI Compliance ScannerKnowledgeBase:
     Type: AWS::Bedrock::KnowledgeBase
     Properties:
-      Name: ThreatLens-Security-KB
+      Name: AI Compliance Scanner-Security-KB
       RoleArn: !GetAtt BedrockRole.Arn
       KnowledgeBaseConfiguration:
         Type: VECTOR

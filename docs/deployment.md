@@ -1,8 +1,8 @@
-# ThreatLens Scanner Deployment Guide
+# AI Compliance Scanner Deployment Guide
 
 ## Overview
 
-This guide covers enterprise deployment of ThreatLens Scanner across development, staging, and production environments with AWS infrastructure setup.
+This guide covers enterprise deployment of AI Compliance Scanner across development, staging, and production environments with AWS infrastructure setup.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ graph TB
     
     subgraph "CI/CD Environment"
         F[GitHub Actions]
-        G[ThreatLens Scanner]
+        G[AI Compliance Scanner]
     end
     
     subgraph "Local Development"
@@ -91,16 +91,16 @@ EOF
 
 # Create IAM role
 aws iam create-role \
-  --role-name ThreatLensBedrockRole \
+  --role-name AI Compliance ScannerBedrockRole \
   --assume-role-policy-document file://bedrock-trust-policy.json
 
 # Attach policies
 aws iam attach-role-policy \
-  --role-name ThreatLensBedrockRole \
+  --role-name AI Compliance ScannerBedrockRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonBedrockFullAccess
 
 aws iam attach-role-policy \
-  --role-name ThreatLensBedrockRole \
+  --role-name AI Compliance ScannerBedrockRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 ```
 
@@ -108,9 +108,9 @@ aws iam attach-role-policy \
 ```bash
 # Create knowledge base
 aws bedrock-agent create-knowledge-base \
-  --name "ThreatLens-Security-KB" \
-  --description "Security compliance knowledge base for ThreatLens Scanner" \
-  --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/ThreatLensBedrockRole" \
+  --name "AI Compliance Scanner-Security-KB" \
+  --description "Security compliance knowledge base for AI Compliance Scanner" \
+  --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/AI Compliance ScannerBedrockRole" \
   --knowledge-base-configuration '{
     "type": "VECTOR",
     "vectorKnowledgeBaseConfiguration": {
@@ -164,7 +164,7 @@ aws s3 sync . s3://your-kb-bucket-name/
 #### Create Data Source
 ```bash
 # Get knowledge base ID from previous step
-KB_ID=$(aws bedrock-agent list-knowledge-bases --query 'knowledgeBaseSummaries[?name==`ThreatLens-Security-KB`].knowledgeBaseId' --output text)
+KB_ID=$(aws bedrock-agent list-knowledge-bases --query 'knowledgeBaseSummaries[?name==`AI Compliance Scanner-Security-KB`].knowledgeBaseId' --output text)
 
 # Create data source
 aws bedrock-agent create-data-source \
@@ -268,7 +268,7 @@ export MAX_AI_CALLS=100
 ```bash
 # Create custom metrics dashboard
 aws cloudwatch put-dashboard \
-  --dashboard-name "ThreatLens-Scanner" \
+  --dashboard-name "AI Compliance Scanner-Scanner" \
   --dashboard-body '{
     "widgets": [
       {
@@ -292,8 +292,8 @@ aws cloudwatch put-dashboard \
 ```bash
 # Create billing alarm
 aws cloudwatch put-metric-alarm \
-  --alarm-name "ThreatLens-High-Cost" \
-  --alarm-description "Alert when ThreatLens costs exceed threshold" \
+  --alarm-name "AI Compliance Scanner-High-Cost" \
+  --alarm-description "Alert when AI Compliance Scanner costs exceed threshold" \
   --metric-name EstimatedCharges \
   --namespace AWS/Billing \
   --statistic Maximum \
@@ -343,7 +343,7 @@ aws cloudwatch put-metric-alarm \
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::account:role/ThreatLensRole"
+        "AWS": "arn:aws:iam::account:role/AI Compliance ScannerRole"
       },
       "Action": "s3:GetObject",
       "Resource": "arn:aws:s3:::kb-bucket/*"
@@ -377,7 +377,7 @@ aws service-quotas get-service-quota \
 
 # Verify IAM permissions
 aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::account:role/ThreatLensBedrockRole \
+  --policy-source-arn arn:aws:iam::account:role/AI Compliance ScannerBedrockRole \
   --action-names bedrock:CreateKnowledgeBase
 ```
 
@@ -423,4 +423,4 @@ aws ce get-cost-and-usage \
 ### **External Resources**
 - [AWS Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
 - [Knowledge Base API Reference](https://docs.aws.amazon.com/bedrock/latest/APIReference/)
-- [ThreatLens GitHub Repository](https://github.com/your-org/threatlens-scanner)
+- [AI Compliance Scanner GitHub Repository](https://github.com/your-org/threatlens-scanner)
