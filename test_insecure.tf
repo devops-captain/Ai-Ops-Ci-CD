@@ -30,14 +30,14 @@ resource "aws_security_group" "secure" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/8"] # Restrict to VPC
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # HTTPS only
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
@@ -53,7 +53,6 @@ resource "aws_db_instance" "secure" {
   manage_master_user_password = true
   vpc_security_group_ids = [aws_security_group.db.id]
 
-  # Use AWS Secrets Manager for database password
   password = data.aws_secretsmanager_secret_version.db_password.secret_string
 }
 
