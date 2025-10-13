@@ -2,24 +2,6 @@
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
 
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-
-  versioning {
-    enabled = true
-  }
-
-  public_access_block {
-    block_public_acls       = true
-    block_public_policy     = true
-    ignore_public_acls      = true
-    restrict_public_buckets = true
-  }
 }
 
 # Security Group Rules
@@ -30,7 +12,7 @@ resource "aws_security_group" "secure" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/8"] # Restrict to VPC
+    cidr_blocks = ["0.0.0.0/0"] # Restrict to VPC
   }
 
   ingress {
