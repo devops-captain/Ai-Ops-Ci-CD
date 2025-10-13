@@ -309,72 +309,93 @@
     "timestamp": "2025-10-10T17:39:19.964103"
   },
   "test_terraform.tf": {
-    "hash": "d131ac22341a2a976b5edee6bdd2c194d4e051d16767f5022588e1b90e44ca7b",
+    "hash": "934a043920fc3076c858a56bf603de3524e68d80c75fb11e62e0427a89ba2a6e",
     "result": {
       "filepath": "test_terraform.tf",
       "language": "Terraform",
       "framework": null,
       "issues": [
         {
-          "line": 48,
+          "line": 21,
+          "severity": "high",
+          "category": "Security Group",
+          "description": "The security group allows SSH access (port 22) from 0.0.0.0/0, which is too broad and should be restricted to a specific IP address or range of IP addresses.",
+          "cvss": 7.5,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 4.1"
+          ],
+          "remediation": "Restrict the SSH ingress rule to a specific IP address or range of IP addresses, following the principle of least privilege.",
+          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
+          "rfc_document": "terraform_security.md, terraform_security.md",
+          "rule_source": "Security Group Rules",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 29,
           "severity": "medium",
-          "category": "Network Security",
-          "description": "Security group allows HTTPS (port 443) access from 0.0.0.0/0 (the public internet)",
+          "category": "Security Group",
+          "description": "The security group allows HTTPS access (port 443) from 0.0.0.0/0, which is too broad and should be restricted to a specific IP address or range of IP addresses.",
           "cvss": 5.3,
           "compliance_violations": [
             "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Restrict HTTPS access to only the necessary IP ranges or security groups that require access",
-          "kb_rule": "Security Group Rules - Never use 0.0.0.0/0 for HTTPS (port 443)",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "CIS AWS Foundations Benchmark 4.1",
+          "remediation": "Restrict the HTTPS ingress rule to a specific IP address or range of IP addresses, following the principle of least privilege.",
+          "kb_rule": "Security Groups - Use least privilege principle",
+          "rfc_document": "terraform_security.md, terraform_security.md",
+          "rule_source": "Security Group Rules",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         },
         {
-          "line": 55,
+          "line": 5,
           "severity": "medium",
-          "category": "Network Security",
-          "description": "Security group allows all outbound traffic (0.0.0.0/0)",
+          "category": "S3 Bucket",
+          "description": "The S3 bucket is not configured with server-side encryption, which is a best practice to protect data at rest.",
           "cvss": 5.3,
           "compliance_violations": [
-            "CIS AWS Foundations Benchmark 4.2"
+            "CIS AWS Foundations Benchmark 2.2"
           ],
-          "remediation": "Restrict outbound traffic to only the necessary IP ranges or security groups that require access",
-          "kb_rule": "Security Groups - Use least privilege principle",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "CIS AWS Foundations Benchmark 4.2",
+          "remediation": "Enable server-side encryption for the S3 bucket using the `server_side_encryption_configuration` block.",
+          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
+          "rfc_document": "terraform_security.md, terraform_security.md",
+          "rule_source": "S3 Bucket Security",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         },
         {
-          "line": 73,
+          "line": 54,
           "severity": "high",
           "category": "Database Security",
-          "description": "Database instance is publicly accessible",
-          "cvss": 8.1,
+          "description": "The database instance is configured to be publicly accessible, which is a security risk.",
+          "cvss": 8.2,
           "compliance_violations": [
             "CIS AWS Foundations Benchmark 3.7"
           ],
-          "remediation": "Set `publicly_accessible = false` to ensure the database instance is not publicly accessible",
+          "remediation": "Set `publicly_accessible = false` to ensure the database instance is not publicly accessible.",
           "kb_rule": "Database Security - Set `publicly_accessible = false`",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "CIS AWS Foundations Benchmark 3.7",
+          "rfc_document": "terraform_security.md, terraform_security.md",
+          "rule_source": "Database Security",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": false,
+      "fixed": true,
       "compliance_violations": [
-        "CIS AWS Foundations Benchmark 4.1",
+        "CIS AWS Foundations Benchmark 2.2",
         "CIS AWS Foundations Benchmark 3.7",
-        "CIS AWS Foundations Benchmark 4.2"
+        "CIS AWS Foundations Benchmark 4.1"
       ]
     },
-    "timestamp": "2025-10-13T03:29:26.148519"
+    "timestamp": "2025-10-13T11:39:54.929920"
   },
   "test_insecure.tf": {
     "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",

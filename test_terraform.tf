@@ -3,6 +3,22 @@
 ################
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+  versioning {
+    enabled = true
+  }
+  public_access_block {
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+  }
 }
 
 ################
@@ -18,7 +34,7 @@ resource "aws_security_group" "secure" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    cidr_blocks     = ["10.0.0.0/8"]
   }
 
   ingress {
@@ -56,7 +72,6 @@ resource "aws_db_instance" "secure_db" {
   vpc_security_group_ids  = [aws_security_group.secure_sg.id]
   backup_retention_period = 7
   monitoring_interval     = 60
-
   manage_master_user_password = true
 }
 
