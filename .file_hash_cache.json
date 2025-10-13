@@ -377,36 +377,169 @@
     "timestamp": "2025-10-13T03:29:26.148519"
   },
   "test_insecure.tf": {
-    "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",
+    "hash": "ce5212af98856375ce909a3e7b95db33e87dcbccd411e843b8f55b7ac32d5c5e",
     "result": {
       "filepath": "test_insecure.tf",
       "language": "Terraform",
       "framework": null,
       "issues": [
         {
-          "line": 40,
+          "line": 2,
           "severity": "medium",
-          "category": "Security Group",
-          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
-          "cvss": 5.3,
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have server-side encryption enabled",
+          "cvss": 5.9,
           "compliance_violations": [
-            "CIS AWS Foundations Benchmark 4.1"
+            "CIS AWS Foundations Benchmark 3.1",
+            "NIST SP 800-53 Rev. 5 SC-28"
           ],
-          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
-          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
-          "rfc_document": "terraform_security.md",
-          "rule_source": "Security Knowledge Base",
+          "remediation": "Enable server-side encryption using the `server_side_encryption_configuration` block",
+          "kb_rule": "S3 Bucket Security - Always enable encryption: `server_side_encryption_configuration`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 3.1, NIST SC-28",
           "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 2,
+          "severity": "medium",
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have public access blocked",
+          "cvss": 5.9,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 3.7",
+            "NIST SP 800-53 Rev. 5 AC-6"
+          ],
+          "remediation": "Add the `public_access_block` block to restrict public access",
+          "kb_rule": "S3 Bucket Security - Block public access: `block_public_acls = true`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 3.7, NIST AC-6",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 2,
+          "severity": "low",
+          "category": "S3 Bucket Security",
+          "description": "S3 bucket does not have versioning enabled",
+          "cvss": 3.9,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 3.8",
+            "NIST SP 800-53 Rev. 5 CP-9"
+          ],
+          "remediation": "Enable versioning using the `versioning { enabled = true }` block",
+          "kb_rule": "S3 Bucket Security - Enable versioning: `versioning { enabled = true }`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 3.8, NIST CP-9",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 15,
+          "severity": "high",
+          "category": "Security Group Rules",
+          "description": "Security group allows SSH access (port 22) from any IP address (0.0.0.0/0)",
+          "cvss": 8.2,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 4.1",
+            "NIST SP 800-53 Rev. 5 AC-3"
+          ],
+          "remediation": "Restrict the `cidr_blocks` for SSH access to a specific IP range, such as the VPC CIDR block",
+          "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 4.1, NIST AC-3",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 22,
+          "severity": "medium",
+          "category": "Security Group Rules",
+          "description": "Security group allows HTTPS access (port 443) from any IP address (0.0.0.0/0)",
+          "cvss": 5.9,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 4.2",
+            "NIST SP 800-53 Rev. 5 AC-3"
+          ],
+          "remediation": "Restrict the `cidr_blocks` for HTTPS access to a specific IP range, such as the VPC CIDR block",
+          "kb_rule": "Security Groups - Use least privilege principle",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 4.2, NIST AC-3",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 30,
+          "severity": "medium",
+          "category": "Database Security",
+          "description": "Database is publicly accessible",
+          "cvss": 5.9,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 5.1",
+            "NIST SP 800-53 Rev. 5 AC-3"
+          ],
+          "remediation": "Set `publicly_accessible = false` to make the database private",
+          "kb_rule": "Database Security - Set `publicly_accessible = false`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 5.1, NIST AC-3",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md"
+          ]
+        },
+        {
+          "line": 31,
+          "severity": "medium",
+          "category": "Database Security",
+          "description": "Database encryption is not enabled",
+          "cvss": 5.9,
+          "compliance_violations": [
+            "CIS AWS Foundations Benchmark 5.2",
+            "NIST SP 800-53 Rev. 5 SC-28"
+          ],
+          "remediation": "Enable encryption by setting `storage_encrypted = true`",
+          "kb_rule": "Database Security - Enable encryption: `storage_encrypted = true`",
+          "rfc_document": "terraform_security.md, terraform_security.md, terraform_security.md",
+          "rule_source": "CIS 5.2, NIST SC-28",
+          "s3_sources": [
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
+            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": false,
+      "fixed": true,
       "compliance_violations": [
-        "CIS AWS Foundations Benchmark 4.1"
+        "CIS AWS Foundations Benchmark 5.2",
+        "NIST SP 800-53 Rev. 5 CP-9",
+        "NIST SP 800-53 Rev. 5 AC-6",
+        "CIS AWS Foundations Benchmark 3.1",
+        "NIST SP 800-53 Rev. 5 AC-3",
+        "CIS AWS Foundations Benchmark 4.2",
+        "CIS AWS Foundations Benchmark 3.7",
+        "NIST SP 800-53 Rev. 5 SC-28",
+        "CIS AWS Foundations Benchmark 4.1",
+        "CIS AWS Foundations Benchmark 3.8",
+        "CIS AWS Foundations Benchmark 5.1"
       ]
     },
-    "timestamp": "2025-10-13T09:59:25.154323"
+    "timestamp": "2025-10-13T10:00:14.990880"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
