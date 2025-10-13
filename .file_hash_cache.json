@@ -387,15 +387,15 @@
           "line": 40,
           "severity": "medium",
           "category": "Security Group",
-          "description": "Security group allows HTTPS traffic from 0.0.0.0/0 (open to the internet)",
+          "description": "Security group allows HTTPS traffic from any IP address (0.0.0.0/0)",
           "cvss": 5.3,
           "compliance_violations": [
             "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Restrict HTTPS traffic to specific IP ranges or use a VPN/bastion host",
+          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
           "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
           "rfc_document": "terraform_security.md",
-          "rule_source": "Security Group Rules",
+          "rule_source": "Security Knowledge Base",
           "s3_sources": [
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
@@ -406,7 +406,7 @@
         "CIS AWS Foundations Benchmark 4.1"
       ]
     },
-    "timestamp": "2025-10-13T09:47:52.378359"
+    "timestamp": "2025-10-13T09:59:25.154323"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
