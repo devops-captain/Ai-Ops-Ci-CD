@@ -316,108 +316,65 @@
       "framework": null,
       "issues": [
         {
-          "line": 5,
-          "severity": "high",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket is not encrypted",
-          "cvss": 7.5,
+          "line": 48,
+          "severity": "medium",
+          "category": "Network Security",
+          "description": "Security group allows HTTPS (port 443) access from 0.0.0.0/0 (the public internet)",
+          "cvss": 5.3,
           "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS"
+            "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Enable server-side encryption for the S3 bucket using the `server_side_encryption_configuration` block",
-          "kb_rule": "Always enable encryption: `server_side_encryption_configuration`",
-          "rfc_document": "terraform_security.md, terraform_security.md",
-          "rule_source": "S3 Bucket Security",
+          "remediation": "Restrict HTTPS access to only the necessary IP ranges or security groups that require access",
+          "kb_rule": "Security Group Rules - Never use 0.0.0.0/0 for HTTPS (port 443)",
+          "rfc_document": "terraform_security.md",
+          "rule_source": "CIS AWS Foundations Benchmark 4.1",
           "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         },
         {
-          "line": 5,
-          "severity": "high",
-          "category": "S3 Bucket Security",
-          "description": "S3 bucket does not have public access blocked",
-          "cvss": 7.5,
+          "line": 55,
+          "severity": "medium",
+          "category": "Network Security",
+          "description": "Security group allows all outbound traffic (0.0.0.0/0)",
+          "cvss": 5.3,
           "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS"
+            "CIS AWS Foundations Benchmark 4.2"
           ],
-          "remediation": "Block public access to the S3 bucket by setting `block_public_acls = true`, `block_public_policy = true`, `ignore_public_acls = true`, and `restrict_public_buckets = true`",
-          "kb_rule": "Block public access: `block_public_acls = true`",
-          "rfc_document": "terraform_security.md, terraform_security.md",
-          "rule_source": "S3 Bucket Security",
+          "remediation": "Restrict outbound traffic to only the necessary IP ranges or security groups that require access",
+          "kb_rule": "Security Groups - Use least privilege principle",
+          "rfc_document": "terraform_security.md",
+          "rule_source": "CIS AWS Foundations Benchmark 4.2",
           "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         },
         {
-          "line": 29,
-          "severity": "high",
-          "category": "Security Group",
-          "description": "Security group allows SSH access from 0.0.0.0/0 (open to the internet)",
-          "cvss": 8.0,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS"
-          ],
-          "remediation": "Restrict SSH access to specific IP ranges, such as the VPC CIDR block (e.g., `cidr_blocks = [\"10.0.0.0/8\"]`)",
-          "kb_rule": "Never use 0.0.0.0/0 for SSH (port 22), restrict to specific IPs",
-          "rfc_document": "terraform_security.md, terraform_security.md",
-          "rule_source": "Security Group Rules",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 52,
-          "severity": "critical",
-          "category": "Database Security",
-          "description": "Database password is hardcoded",
-          "cvss": 9.8,
-          "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS"
-          ],
-          "remediation": "Use AWS Secrets Manager to store and retrieve the database password securely",
-          "kb_rule": "NEVER use: `password = \"plaintext\"`",
-          "rfc_document": "terraform_security.md, terraform_security.md",
-          "rule_source": "Hardcoded Secrets",
-          "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
-            "s3://ai-security-kb-docs-2025/terraform_security.md"
-          ]
-        },
-        {
-          "line": 54,
+          "line": 73,
           "severity": "high",
           "category": "Database Security",
-          "description": "Database is publicly accessible",
-          "cvss": 8.0,
+          "description": "Database instance is publicly accessible",
+          "cvss": 8.1,
           "compliance_violations": [
-            "NIST SP 800-171",
-            "PCI DSS"
+            "CIS AWS Foundations Benchmark 3.7"
           ],
-          "remediation": "Set `publicly_accessible = false` to make the database private",
-          "kb_rule": "Set `publicly_accessible = false`",
-          "rfc_document": "terraform_security.md, terraform_security.md",
-          "rule_source": "Database Security",
+          "remediation": "Set `publicly_accessible = false` to ensure the database instance is not publicly accessible",
+          "kb_rule": "Database Security - Set `publicly_accessible = false`",
+          "rfc_document": "terraform_security.md",
+          "rule_source": "CIS AWS Foundations Benchmark 3.7",
           "s3_sources": [
-            "s3://ai-security-kb-docs-2025/terraform_security.md",
             "s3://ai-security-kb-docs-2025/terraform_security.md"
           ]
         }
       ],
-      "fixed": true,
+      "fixed": false,
       "compliance_violations": [
-        "NIST SP 800-171",
-        "PCI DSS"
+        "CIS AWS Foundations Benchmark 4.1",
+        "CIS AWS Foundations Benchmark 3.7",
+        "CIS AWS Foundations Benchmark 4.2"
       ]
     },
-    "timestamp": "2025-10-10T17:46:07.730196"
+    "timestamp": "2025-10-13T03:29:26.148519"
   },
   "test_insecure.tf": {
     "hash": "2fe64c1ffc2048e68ebbc440c97b13d6f948567811fe17597830907b25555c9f",
