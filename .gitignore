@@ -40,3 +40,6 @@ credentials
 *.log
 logs/
 .compliance_cache.json
+
+# Cache files
+.file_hash_cache.json
