@@ -1,50 +1,44 @@
-#!/usr/bin/env python3
 import os
 import sqlite3
 import subprocess
+from boto3 import client
 
-# Hardcoded credentials - violates organization security policy
-API_KEY = "sk-prod-1234567890abcdef"
-DATABASE_PASSWORD = "SuperSecret123!"
-JWT_SECRET = "my-jwt-secret-key"
-ADMIN_TOKEN = "admin-token-12345"
+# Use environment variables or AWS Secrets Manager for secrets
+api_key = os.environ.get('API_KEY')
+secrets_client = client('secretsmanager')
+db_password_secret = secrets_client.get_secret_value(SecretId='db-password')
+db_password = db_password_secret['SecretString']
+jwt_secret = os.environ.get('JWT_SECRET')
+admin_token = os.environ.get('ADMIN_TOKEN')
 
 def get_user_data(user_id):
-    # SQL injection vulnerability - violates secure coding standards
     conn = sqlite3.connect('production.db')
     cursor = conn.cursor()
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    cursor.execute(query)
+    query = "SELECT * FROM users WHERE id = %s"
+    cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
 def execute_command(cmd):
-    # Command injection vulnerability - violates input validation policy
-    result = subprocess.run(f"ls {cmd}", shell=True, capture_output=True)
-    return result.stdout
+    if isinstance(cmd, str) and cmd.isalnum():
+        result = subprocess.run(["ls", cmd], capture_output=True)
+        return result.stdout
+    else:
+        return b"Invalid command"
 
 def upload_file(filename, content):
-    # Path traversal vulnerability - violates file handling policy
-    file_path = f"/uploads/{filename}"
+    file_path = os.path.join("/uploads", os.path.basename(filename))
     with open(file_path, 'w') as f:
         f.write(content)
 
 def send_sensitive_data(data):
-    # Unencrypted transmission - violates data protection policy
     import requests
-    response = requests.post("http://api.example.com/data", json=data)
+    response = requests.post("https://api.example.com/data", json=data)
     return response.json()
 
-# Debug mode in production - violates deployment policy
-DEBUG = True
-if DEBUG:
-    print(f"API Key: {API_KEY}")
-    print(f"Database Password: {DATABASE_PASSWORD}")
-    print(f"Admin Token: {ADMIN_TOKEN}")
+DEBUG = False
 
-# Weak authentication - violates access control policy
 def authenticate_user(username, password):
-    if len(password) < 4:  # Weak password policy
-        return False
-    if username == "admin" and password == "admin":  # Default credentials
-        return True
+    if len(password) >= 8 and any(char.isdigit() for char in password) and any(char.isupper() for char in password) and any(char.islower() for char in password):
+        if username == "admin" and password == os.environ.get('ADMIN_PASSWORD'):
+            return True
     return False
