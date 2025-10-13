@@ -106,102 +106,49 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          let comment = `## 🔒 Compliance Security Scan Results\n\n`;
-          comment += `**Auto-fix:** ${{ steps.params.outputs.auto_fix }}\n`;
-          comment += `**Model:** ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0' }}\n`;
-          comment += `**Knowledge Base:** ${{ vars.BEDROCK_KB_ID || 'RL3YC1HUKZ' }}\n`;
-          comment += `**Region:** ${{ vars.AWS_REGION || 'us-east-1' }}\n\n`;
+          let comment = `## Organization Knowledge Base - Policy Analysis\n\n`;
           
           if (fs.existsSync('compliance_report.json')) {
             const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));
             
-            comment += `### 📊 Summary\n`;
-            comment += `- Files scanned: ${report.files_scanned}\n`;
-            comment += `- Issues found: ${report.total_issues}\n`;
-            comment += `- AI calls: ${report.ai_calls}\n`;
-            comment += `- Cost: $${report.cost.toFixed(4)}\n`;
+            comment += `**Policy Gaps:** ${report.total_issues || 0}\n`;
+            comment += `**CVEs Detected:** ${report.cve_count || 0}\n`;
+            comment += `**Compliance Status:** ${report.total_issues > 0 ? 'Non-Compliant' : 'Compliant'}\n\n`;
             
-            if (report.fixed > 0) {
-              comment += `- **Auto-fixed:** ${report.fixed} files ✅\n`;
-            }
-            
-            comment += `\n### 🎯 By Severity\n`;
-            for (const [severity, count] of Object.entries(report.by_severity)) {
-              if (count > 0) {
-                const emoji = severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'medium' ? '🟡' : '🟢';
-                comment += `- ${emoji} **${severity.toUpperCase()}**: ${count}\n`;
-              }
-            }
-            
-            if (Object.keys(report.compliance_summary || {}).length > 0) {
-              comment += `\n### 📋 Compliance Violations\n`;
-              for (const [standard, data] of Object.entries(report.compliance_summary)) {
-                comment += `- **${standard}**: ${data.issues} issues (${data.critical} critical, ${data.high} high)\n`;
-              }
-            }
-            
-            // Add detailed issues breakdown
-            if (report.results && report.results.length > 0) {
-              comment += `\n### 🚨 Detailed Issues\n\n`;
+            if (report.total_issues > 0) {
+              comment += `### Policy Violations (${report.total_issues})\n\n`;
               
-              // Group issues by file
-              const fileGroups = {};
-              for (const result of report.results) {
-                if (result.issues && result.issues.length > 0) {
-                  fileGroups[result.filepath] = result.issues;
+              if (report.results && report.results.length > 0) {
+                const fileGroups = {};
+                for (const result of report.results) {
+                  if (result.issues && result.issues.length > 0) {
+                    fileGroups[result.filepath] = result.issues;
+                  }
+                }
+                
+                for (const [filepath, issues] of Object.entries(fileGroups)) {
+                  comment += `#### 📁 \`${filepath}\`\n`;
+                  
+                  const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+                  issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+                  
+                  for (const issue of issues.slice(0, 5)) {
+                    const emoji = issue.severity === 'critical' ? '🚨' : issue.severity === 'high' ? '⚠️' : 'ℹ️';
+                    comment += `${emoji} **Line ${issue.line}** (${issue.severity.toUpperCase()}): ${issue.description}\n`;
+                    if (issue.remediation) comment += `   💡 ${issue.remediation}\n`;
+                    comment += `\n`;
+                  }
+                  
+                  if (issues.length > 5) {
+                    comment += `... and ${issues.length - 5} more violations\n\n`;
+                  }
                 }
               }
-              
-              for (const [filepath, issues] of Object.entries(fileGroups)) {
-                comment += `#### 📁 \`${filepath}\`\n`;
-                
-                // Sort by severity (critical first)
-                const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
-                issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-                
-                for (const issue of issues) { // Show ALL issues, no limit
-                  const emoji = issue.severity === 'critical' ? '🔴' : issue.severity === 'high' ? '🟠' : issue.severity === 'medium' ? '🟡' : '🟢';
-                  comment += `${emoji} **Line ${issue.line}** (${issue.severity.toUpperCase()}): ${issue.description}\n`;
-                  
-                  if (issue.compliance_violations && issue.compliance_violations.length > 0) {
-                    comment += `   📋 *Violates: ${issue.compliance_violations.join(', ')}*\n`;
-                  }
-                  
-                  if (issue.rfc_document) {
-                    comment += `   📄 *RFC Document: ${issue.rfc_document}*\n`;
-                  }
-                  
-                  if (issue.s3_sources && issue.s3_sources.length > 0) {
-                    comment += `   🗂️ *S3 Sources: ${issue.s3_sources.join(', ')}*\n`;
-                  }
-                  
-                  if (issue.kb_rule) {
-                    comment += `   📚 *KB Rule: ${issue.kb_rule}*\n`;
-                  }
-                  
-                  if (issue.rule_source) {
-                    comment += `   🔗 *Source: ${issue.rule_source}*\n`;
-                  }
-                  
-                  if (issue.remediation) {
-                    comment += `   🔧 *Fix: ${issue.remediation}*\n`;
-                  }
-                  comment += `\n`;
-                }
-                comment += `\n`;
-              }
             }
             
-            if (report.by_severity.critical > 0) {
-              comment += `### ❌ Critical Issues Found\n`;
-              comment += `**${report.by_severity.critical} critical** security issues must be fixed before merging.\n\n`;
-              comment += `**Action Required:**\n`;
-              comment += `1. Review the critical issues listed above\n`;
-              comment += `2. Apply the suggested fixes\n`;
-              comment += `3. Re-run the scan to verify fixes\n`;
-            }
+            comment += `\n*Analysis based on your organization's policies and standards*`;
           } else {
-            comment += `Scan completed but no detailed report available.\n`;
+            comment += `Policy analysis completed but no detailed report available.\n`;
           }
           
           github.rest.issues.createComment({

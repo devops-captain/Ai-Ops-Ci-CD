@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔍 ThreatLens - Executive Security Dashboard</title>
+    <title>🧠 Organization Knowledge Base - Policy Analysis Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -450,9 +450,9 @@
         <div class="header">
             <div class="detective-icon">🕵️</div>
             <div class="header-content">
-                <h1>🔍 ThreatLens</h1>
-                <p>Executive Security Intelligence Dashboard</p>
-                <div class="tagline">"Detecting Threats Before They Detect You"</div>
+                <h1>🧠 Organization Knowledge Base</h1>
+                <p>Policy Compliance Analysis Dashboard</p>
+                <div class="tagline">"Your Policies, Your Standards, Your Security"</div>
             </div>
         </div>
 
@@ -517,13 +517,13 @@
         </div>
 
         <div class="chart-container">
-            <div class="chart-title">📊 Security Trends - Leadership View</div>
+            <div class="chart-title">📊 Policy Compliance Trends - Leadership View</div>
             <canvas id="trendChart"></canvas>
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="showTab('recent')">Recent Scans</button>
-            <button class="tab" onclick="showTab('issues')">All Issues</button>
+            <button class="tab active" onclick="showTab('recent')">Policy Analysis</button>
+            <button class="tab" onclick="showTab('issues')">Policy Violations</button>
             <button class="tab" onclick="showTab('files')">Files Detail</button>
             <button class="tab" onclick="showTab('compliance')">Compliance</button>
             <button class="tab" onclick="showTab('vulnerabilities')">🔍 Vulnerabilities</button>
@@ -531,7 +531,7 @@
 
         <div id="recent" class="tab-content active">
             <div class="table-container">
-                <h2>📅 Recent Security Scans</h2>
+                <h2>📅 Recent Policy Analysis Scans</h2>
                 <div id="loading" class="loading">Loading scan data...</div>
                 <table id="scansTable" style="display: none;">
                     <thead>
@@ -553,7 +553,7 @@
 
         <div id="issues" class="tab-content">
             <div class="table-container">
-                <h2>🚨 Security Issues with KB Sources</h2>
+                <h2>🚨 Policy Violations with Knowledge Base Sources</h2>
                 <table id="issuesTable">
                     <thead>
                         <tr>
@@ -1512,7 +1512,7 @@
                             `;
                         });
                     } else {
-                        html += `<p style="margin-left: 20px; color: #00ff41; padding: 10px;">✅ No security issues detected in this file</p>`;
+                        html += `<p style="margin-left: 20px; color: #00ff41; padding: 10px;">✅ No policy violations detected in this file</p>`;
                     }
                     
                     html += `</div>`;

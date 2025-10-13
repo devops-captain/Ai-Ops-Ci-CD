@@ -748,17 +748,17 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
     
     def print_executive_summary(self, report):
         """Print executive summary for leadership"""
-        print(f"\n📊 Executive Summary:")
-        print(f"   🔍 Security Posture: {'🔴 CRITICAL' if report['by_severity']['critical'] > 0 else '🟡 NEEDS ATTENTION' if report['by_severity']['high'] > 0 else '🟢 GOOD'}")
-        print(f"   📁 Code Coverage: {report['files_scanned']} files scanned")
-        print(f"   🎯 Risk Level: {report['by_severity']['critical']} critical, {report['by_severity']['high']} high priority issues")
-        print(f"   💰 Scan Efficiency: ${report['cost']:.4f} cost, {report['ai_calls']} AI calls")
+        print(f"\n📊 Organization Knowledge Base Analysis Summary:")
+        print(f"   🧠 Policy Compliance: {'🔴 CRITICAL' if report['by_severity']['critical'] > 0 else '🟡 NEEDS ATTENTION' if report['by_severity']['high'] > 0 else '🟢 GOOD'}")
+        print(f"   📁 Code Coverage: {report['files_scanned']} files analyzed against your policies")
+        print(f"   🎯 Risk Level: {report['by_severity']['critical']} critical, {report['by_severity']['high']} high priority policy violations")
+        print(f"   💰 Analysis Efficiency: ${report['cost']:.4f} cost, {report['ai_calls']} AI calls")
         
         # Top compliance violations
         top_violations = sorted(report['compliance_summary'].items(), key=lambda x: x[1]['issues'], reverse=True)[:3]
-        print(f"   📋 Top Compliance Gaps:")
+        print(f"   📋 Top Policy Gaps:")
         for standard, data in top_violations:
-            print(f"      • {standard}: {data['issues']} issues across {len(set(data['files']))} files")
+            print(f"      • {standard}: {data['issues']} policy violations across {len(set(data['files']))} files")
         
         # Cache efficiency
         cache_efficiency = ((10 - report['ai_calls']) / 10) * 100 if report['files_scanned'] > 0 else 0
@@ -936,7 +936,8 @@ Return ONLY the complete fixed code without any explanation comments. Do not add
     
     def run(self, auto_fix=False):
         """Main compliance scan"""
-        print(f"🔒 Compliance-Focused AI Security Scanner")
+        print(f"🧠 Organization Knowledge Base Security Analysis")
+        print(f"📚 Analyzing code against YOUR organization's security policies")
         print(f"Model: {self.model_id}")
         print(f"Knowledge Base ID: {self.kb_id}")
         
