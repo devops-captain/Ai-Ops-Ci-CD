@@ -392,7 +392,7 @@
           "compliance_violations": [
             "CIS AWS Foundations Benchmark 4.1"
           ],
-          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` parameter.",
+          "remediation": "Restrict HTTPS traffic to only the necessary IP addresses or ranges using the `cidr_blocks` argument.",
           "kb_rule": "Security Groups - Never use 0.0.0.0/0 for SSH (port 22) - Restrict to specific IPs: `cidr_blocks = [\"YOUR_IP/32\"]`",
           "rfc_document": "terraform_security.md",
           "rule_source": "Security Knowledge Base",
@@ -406,7 +406,7 @@
         "CIS AWS Foundations Benchmark 4.1"
       ]
     },
-    "timestamp": "2025-10-13T09:59:25.154323"
+    "timestamp": "2025-10-13T11:24:30.767159"
   },
   "test_simulation.tf": {
     "hash": "e80f39cdca526397560dba7a855b0a5374a4ce36179588e6c6c7d21edde238b6",
