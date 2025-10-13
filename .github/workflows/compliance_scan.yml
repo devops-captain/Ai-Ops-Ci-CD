@@ -106,17 +106,17 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          let comment = `## Organization Knowledge Base - Policy Analysis\n\n`;
+          let comment = `## 📚 Organization Knowledge Base - Policy Analysis\n\n`;
           
           if (fs.existsSync('compliance_report.json')) {
             const report = JSON.parse(fs.readFileSync('compliance_report.json', 'utf8'));
             
-            comment += `**Policy Gaps:** ${report.total_issues || 0}\n`;
-            comment += `**CVEs Detected:** ${report.cve_count || 0}\n`;
-            comment += `**Compliance Status:** ${report.total_issues > 0 ? 'Non-Compliant' : 'Compliant'}\n\n`;
+            comment += `**📊 Policy Gaps:** ${report.total_issues || 0}\n`;
+            comment += `**🚨 CVEs Detected:** ${report.cve_count || 0}\n`;
+            comment += `**✅ Compliance Status:** ${report.total_issues > 0 ? '❌ Non-Compliant' : '✅ Compliant'}\n\n`;
             
             if (report.total_issues > 0) {
-              comment += `### Policy Violations (${report.total_issues})\n\n`;
+              comment += `### 🔍 Policy Violations (${report.total_issues})\n\n`;
               
               if (report.results && report.results.length > 0) {
                 const fileGroups = {};
@@ -135,22 +135,22 @@ jobs:
                   for (const issue of issues.slice(0, 5)) {
                     const emoji = issue.severity === 'critical' ? '🚨' : issue.severity === 'high' ? '⚠️' : 'ℹ️';
                     comment += `${emoji} **Line ${issue.line}: ${issue.severity.toUpperCase()}**\n\n`;
-                    comment += `**Issue Description:**\n${issue.description}\n\n`;
+                    comment += `**📝 Issue Description:**\n${issue.description}\n\n`;
                     
                     if (issue.compliance_violations && issue.compliance_violations.length > 0) {
-                      comment += `**Compliance Violations:**\n${issue.compliance_violations.join(', ')}\n\n`;
+                      comment += `**📋 Compliance Violations:**\n${issue.compliance_violations.join(', ')}\n\n`;
                     }
                     
                     if (issue.kb_rule) {
-                      comment += `**Knowledge Base Source:**\n${issue.kb_rule}\n\n`;
+                      comment += `**📚 Knowledge Base Source:**\n${issue.kb_rule}\n\n`;
                     }
                     
                     if (issue.s3_sources && issue.s3_sources.length > 0) {
-                      comment += `**S3 RFC Documentation:**\n${issue.s3_sources.join('\n')}\n\n`;
+                      comment += `**📄 S3 RFC Documentation:**\n${issue.s3_sources.join('\n')}\n\n`;
                     }
                     
                     if (issue.remediation) {
-                      comment += `**Recommended Fix:**\n${issue.remediation}\n\n`;
+                      comment += `**🔧 Recommended Fix:**\n${issue.remediation}\n\n`;
                     }
                     
                     comment += `---\n\n`;
@@ -163,7 +163,7 @@ jobs:
               }
             }
             
-            comment += `\n*Analysis based on your organization's policies and standards*`;
+            comment += `\n*🏢 Analysis based on your organization's policies and standards*`;
           } else {
             comment += `Policy analysis completed but no detailed report available.\n`;
           }
