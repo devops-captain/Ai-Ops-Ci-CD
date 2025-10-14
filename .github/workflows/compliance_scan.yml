@@ -51,7 +51,7 @@ jobs:
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           AUTO_FIX="${{ github.event.inputs.auto_fix }}"
         else
-          AUTO_FIX="true"  # Enable auto-fix for all events (PR, push, schedule)
+          AUTO_FIX="false"  # Enable auto-fix for all events (PR, push, schedule)
         fi
         echo "auto_fix=$AUTO_FIX" >> $GITHUB_OUTPUT
         echo "Auto-fix enabled: $AUTO_FIX"
