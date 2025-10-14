@@ -3,7 +3,6 @@
 ################
 resource "aws_s3_bucket" "secure" {
   bucket = "my-secure-bucket"
-
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
@@ -11,11 +10,9 @@ resource "aws_s3_bucket" "secure" {
       }
     }
   }
-
   versioning {
     enabled = true
   }
-
   public_access_block {
     block_public_acls       = true
     block_public_policy     = true
@@ -75,7 +72,6 @@ resource "aws_db_instance" "secure_db" {
   vpc_security_group_ids  = [aws_security_group.secure_sg.id]
   backup_retention_period = 7
   monitoring_interval     = 60
-
   manage_master_user_password = true
 }
 
