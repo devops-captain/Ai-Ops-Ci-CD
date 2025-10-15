@@ -19,14 +19,7 @@ Monthly Cost (100 scans): $2-4
 Annual Cost (1200 scans): $24-48
 ```
 
-### **Cost Comparison**
-| Tool | Monthly Cost | Annual Cost | Cost per Scan |
-|------|-------------|-------------|---------------|
-| **AI Compliance Scanner** | $2-4 | $24-48 | $0.02-0.04 |
-| SonarQube | $50 | $600 | $0.50 |
-| Veracode | $200 | $2,400 | $2.00 |
-| Checkmarx | $300 | $3,600 | $3.00 |
-| Snyk | $100 | $1,200 | $1.00 |
+
 
 ## AI Model Optimization
 
